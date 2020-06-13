@@ -18,7 +18,7 @@ class MessageTypes:
 
     @staticmethod
     def is_moderation_message(msg_type):
-        return msg_type in (MessageTypes.MUTE, MessageTypes.UNMUTE, MessageTypes.BAN, MessageTypes.UNBAN, MessageTypes.SUB_ONLY)
+        return msg_type in (MessageTypes.MUTE, MessageTypes.UNMUTE, MessageTypes.BAN, MessageTypes.UNBAN)
 
 
 class Message:
@@ -69,6 +69,10 @@ class User:
         self.nick = msg.get('nick')
         self.features = msg.get('features')
 
+    @property
+    def is_subbed(self):
+        return "subscribed" in self.features
+
 
 class ServedConnections(Message):
     def __init__(self, msg):
@@ -84,7 +88,6 @@ class UserJoined(Message):
         super().__init__(msg)
         self.user = User(self.payload)
         self.timestamp = self.payload.get('timestamp')
-        self.data = self.payload.get('data')
 
 
 class UserQuit(Message):
@@ -92,14 +95,13 @@ class UserQuit(Message):
         super().__init__(msg)
         self.user = User(self.payload)
         self.timestamp = self.payload.get('timestamp')
-        self.data = self.payload.get('data')
 
 
 class Broadcast(Message):
     def __init__(self, msg):
         super().__init__(msg)
         self.timestamp = self.payload.get('timestamp')
-        self.data = self.payload.get('data')
+        self.content = self.payload.get('data')
 
 
 class ChatMessage(Message):
@@ -107,7 +109,7 @@ class ChatMessage(Message):
         super().__init__(msg)
         self.user = User(self.payload)
         self.timestamp = self.payload.get('timestamp')
-        self.data = self.payload.get('data')
+        self.content = self.payload.get('data')
 
 
 class Whisper(Message):
@@ -116,12 +118,23 @@ class Whisper(Message):
         self.user = User(self.payload)
         self.message_id = self.payload.get('messageid')
         self.timestamp = self.payload.get('timestamp')
-        self.data = self.payload.get('data')
+        self.content = self.payload.get('data')
 
 
 class ModerationMessage(Message):
     def __init__(self, msg):
         super().__init__(msg)
-        self.user = User(self.payload)
+        self.moderator = User(self.payload)
         self.timestamp = self.payload.get('timestamp')
-        self.data = self.payload.get('data')
+        user, *sentence = self.payload.get('data').split()
+        self.affected_user = user
+        self.sentence = ' '.join(sentence)
+
+
+class SubOnly(Message):
+    def __init__(self, msg):
+        super().__init__(msg)
+        self.moderator = User(self.payload)
+        self.timestamp = self.payload.get('timestamp')
+        # on or off
+        self.mode = self.payload.get('data')

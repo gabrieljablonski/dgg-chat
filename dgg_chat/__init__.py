@@ -5,11 +5,11 @@ from queue import Queue
 from sched import scheduler
 from threading import Thread
 from websocket import WebSocketApp
+from websocket._exceptions import WebSocketException
 
-from ._messages import Message, MessageTypes
+from .messages import Message, MessageTypes
 from ._utils import format_payload, bind_method
-from ._handler import DGGChatWSHandler
-from ._logger import setup_logger
+from ._handler import DGGChatHandler
 
 
 class AnonymousConnectionError(Exception):
@@ -39,6 +39,18 @@ class DGGChat:
         on_ban=None, on_unban=None,
         on_sub_only=None, on_error_message=None,
     ):
+        any_specific_handler_was_set = any([
+            on_served_connections, on_user_joined, on_user_quit,
+            on_broadcast, on_chat_message, on_whisper, on_whisper_sent, 
+            on_mute, on_unmute, on_ban, on_unban, 
+            on_sub_only, on_error_message
+        ])
+        if on_any_message != None and any_specific_handler_was_set:
+            raise ValueError(
+                'if `on_any_message` is provided, no other `on_` event '
+                'can be set (aside from `on_close`)'
+            )
+
         self.print_messages = print_messages
         self.try_resend_on_throttle = try_resend_on_throttle
         
@@ -90,13 +102,13 @@ class DGGChat:
                     self._last_message_time = now
                 self._next_message_time = now + self._throttle_factor*self.THROTTLE_DELAY
 
-            self._handler.on_any_message(ws, parsed)
+            self._handler.on_any_message(self, parsed)
 
         # websocket related errors (`on_error_message` is business related, i.e. `ERR` messages)
         def _on_error(ws, error):
             msg = f"websocket error: `{error}`"
             logging.error(msg)
-            print(msg)
+            raise WebSocketException(msg)
 
         def _on_close(ws):
             logging.info('closing connection')
@@ -104,7 +116,7 @@ class DGGChat:
 
         on_close = on_close or _on_close
         
-        self._handler = DGGChatWSHandler(
+        self._handler = DGGChatHandler(
             on_any_message, on_served_connections, 
             on_user_joined, on_user_quit,
             on_broadcast, on_chat_message, 
@@ -179,14 +191,12 @@ class DGGChat:
         if not self._auth_token:
             logging.fatal("can't send chat message: anonymous connection")
             raise AnonymousConnectionError('`auth_token` must be informed to send chat messages')
+        logging.info('sending chat message')
         self._enqueue_message(MessageTypes.CHAT_MESSAGE, data=message)
 
     def send_whisper(self, user, message):
         if not self._auth_token:
             logging.fatal("can't send whisper: anonymous connection")
             raise AnonymousConnectionError('`auth_token` must be informed to send whispers')
+        logging.info('sending whisper')
         self._enqueue_message(MessageTypes.WHISPER, nick=user, data=message)
-
-    def reply_whisper(self, received, message):
-        logging.info('replying whisper: `{received}`')
-        self.send_whisper(received.user.nick, message)

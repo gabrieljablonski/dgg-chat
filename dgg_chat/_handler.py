@@ -1,10 +1,22 @@
 import logging
 
-from ._messages import MessageTypes
+from .messages import (
+    MessageTypes,
+    Message,
+    User,
+    ServedConnections,
+    UserJoined,
+    UserQuit,
+    Broadcast,
+    ChatMessage,
+    Whisper,
+    ModerationMessage,
+    SubOnly
+)
 from ._utils import bind_method
 
 
-class DGGChatWSHandler:
+class DGGChatHandler:
     def __init__(
         self, on_any_message=None,
         on_served_connections=None, on_user_joined=None, on_user_quit=None,
@@ -27,7 +39,7 @@ class DGGChatWSHandler:
         if on_whisper:
             self.on_whisper = bind_method(on_whisper, self)
         if on_whisper_sent:
-            self.on_whisper_sent = bind_method(lambda ws, _: on_whisper_sent(ws), self)
+            self.on_whisper_sent = bind_method(on_whisper_sent, self)
         if on_mute:
             self.on_mute = bind_method(on_mute, self)
         if on_unmute:
@@ -41,7 +53,10 @@ class DGGChatWSHandler:
         if on_error_message:
             self.on_error_message = bind_method(on_error_message, self)
 
-    def on_any_message(self, ws, message):
+    def on_any_message(self, chat, message: Message):
+        if message.type == MessageTypes.WHISPER_SENT:
+            # whisper sent is the only handler that doesn't have a message (i.e. arity 1)
+            return self.on_whisper_sent(chat)
         handler_mapping = {
             MessageTypes.SERVED_CONNECTIONS: self.on_served_connections,
             MessageTypes.USER_JOINED: self.on_user_joined,
@@ -58,44 +73,44 @@ class DGGChatWSHandler:
             MessageTypes.ERROR: self.on_error_message,
         }
         if message.type in handler_mapping:
-            return handler_mapping[message.type](ws, message)
+            return handler_mapping[message.type](chat, message)
         logging.warning(f"message type `{message.type}` not handled: `{message}`")
 
-    def on_served_connections(self, ws, message):
+    def on_served_connections(self, chat, message: ServedConnections):
         pass
 
-    def on_user_joined(self, ws, message):
+    def on_user_joined(self, chat, message: UserJoined):
         pass
 
-    def on_user_quit(self, ws, message):
+    def on_user_quit(self, chat, message: UserQuit):
         pass
 
-    def on_broadcast(self, ws, message):
+    def on_broadcast(self, chat, message: Broadcast):
         pass
 
-    def on_chat_message(self, ws, message):
+    def on_chat_message(self, chat, message: ChatMessage):
         pass
 
-    def on_whisper(self, ws, message):
+    def on_whisper(self, chat, message: Whisper):
         pass
 
-    def on_whisper_sent(self, ws, message):
+    def on_whisper_sent(self, chat):
         pass
 
-    def on_mute(self, ws, message):
+    def on_mute(self, chat, message: ModerationMessage):
         pass
 
-    def on_unmute(self, ws, message):
+    def on_unmute(self, chat, message: ModerationMessage):
         pass
 
-    def on_ban(self, ws, message):
+    def on_ban(self, chat, message: ModerationMessage):
         pass
 
-    def on_unban(self, ws, message):
+    def on_unban(self, chat, message: ModerationMessage):
         pass
 
-    def on_sub_only(self, ws, message):
+    def on_sub_only(self, chat, message: SubOnly):
         pass
     
-    def on_error_message(self, ws, message):
+    def on_error_message(self, chat, message: Message):
         pass

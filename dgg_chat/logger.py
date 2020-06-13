@@ -1,5 +1,6 @@
 import os
 import logging
+from logging import NOTSET, DEBUG, INFO, WARNING, ERROR, CRITICAL
 from logging.handlers import RotatingFileHandler
 
 
