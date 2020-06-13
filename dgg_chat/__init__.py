@@ -1,6 +1,7 @@
 import time
 import logging
 import queue
+from os import getenv
 from queue import Queue
 from sched import scheduler
 from threading import Thread
@@ -10,6 +11,16 @@ from websocket._exceptions import WebSocketException
 from .messages import Message, MessageTypes
 from ._utils import format_payload, bind_method
 from ._handler import DGGChatHandler
+
+
+class DumbFucksBeware(Exception):
+    def __init__(self, message):
+        super().__init__(
+            f"{message}\n"
+            "If you end up doing some dumb shit and getting banned from dgg, "
+            "I take no responsibility from this point on. "
+            "In any case, have a look at the source code."
+        )
 
 
 class AnonymousConnectionError(Exception):
@@ -65,6 +76,8 @@ class DGGChat:
         self._unhandled_messages = Queue(maxsize=1)
         Thread(target=self._send_loop, daemon=True).start()
 
+        self._available_users_to_whisper = set()
+
         def _on_message(ws, message):
             parsed = Message.parse(message)
             logging.debug(f"received message: `{message}`")
@@ -101,7 +114,8 @@ class DGGChat:
                 else:
                     self._last_message_time = now
                 self._next_message_time = now + self._throttle_factor*self.THROTTLE_DELAY
-
+            if parsed.type == MessageTypes.WHISPER:
+                self._available_users_to_whisper.add(parsed.user.nick)
             self._handler.on_any_message(self, parsed)
 
         # websocket related errors (`on_error_message` is business related, i.e. `ERR` messages)
@@ -182,7 +196,7 @@ class DGGChat:
             self._ws.send(payload)
             self._unhandled_messages.put(payload)
 
-    def _enqueue_message(self, type, **kwargs):
+    def _queue_message(self, type, **kwargs):
         payload = format_payload(type, **kwargs)
         logging.debug(f"enqueueing payload: `{payload}`")
         self._queued_messages.put(payload)
@@ -191,12 +205,18 @@ class DGGChat:
         if not self._auth_token:
             logging.fatal("can't send chat message: anonymous connection")
             raise AnonymousConnectionError('`auth_token` must be informed to send chat messages')
+        enabled = str(getenv('DGG_ENABLE_CHAT_MESSAGES')).lower()
+        if not enabled or enabled in ('none', 'false'):
+            raise DumbFucksBeware("sending chat messages is currently disabled")
         logging.info('sending chat message')
-        self._enqueue_message(MessageTypes.CHAT_MESSAGE, data=message)
+        self._queue_message(MessageTypes.CHAT_MESSAGE, data=message)
 
     def send_whisper(self, user, message):
         if not self._auth_token:
             logging.fatal("can't send whisper: anonymous connection")
             raise AnonymousConnectionError('`auth_token` must be informed to send whispers')
         logging.info('sending whisper')
-        self._enqueue_message(MessageTypes.WHISPER, nick=user, data=message)
+        enabled = str(getenv('DGG_ENABLE_WHISPER_FIRST')).lower()
+        if (not enabled or enabled in ('none', 'false')) and user not in self._available_users_to_whisper:
+            raise DumbFucksBeware("whispers can only be sent to users who whispered you first this session")
+        self._queue_message(MessageTypes.WHISPER, nick=user, data=message)
