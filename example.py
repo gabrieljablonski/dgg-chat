@@ -1,8 +1,5 @@
-import time
 from os import getenv
 from dotenv import load_dotenv
-from random import choice
-from traceback import format_exc
 
 from dgg_chat import DGGChat
 from dgg_chat.messages import (
@@ -17,7 +14,7 @@ from dgg_chat.messages import (
     ModerationMessage,
     SubOnly
 )
-from dgg_chat.logger import setup_logger, DEBUG
+from dgg_chat.logger import setup_logger, DEBUG, INFO
 
 
 def on_any_message(c: DGGChat, msg: Message):
@@ -104,14 +101,12 @@ chat = DGGChat(
     on_sub_only=on_sub_only,
     on_error_message=on_error_message,
 )
-try:
-    chat.run_forever()
-except Exception as e:
-    format_exc()
-    raise e
-    
 
-## in case you need to do other stuff, 
+while chat.run_forever(): 
+    pass
+
+
+## if you don't mind manually reconnecting in case of a sudden disconnect,
 ## the chat handler can be run in the background like this:
 
 # chat = DGGChat(auth_token=dgg_auth_token, ...)
