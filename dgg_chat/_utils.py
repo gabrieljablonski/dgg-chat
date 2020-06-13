@@ -7,5 +7,4 @@ def format_payload(type, **kwargs):
 
 
 def bind_method(method, obj):
-    return MethodType(method, obj)
-
+    return MethodType(lambda self, *args: method(*args), obj)
