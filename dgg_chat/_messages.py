@@ -25,10 +25,11 @@ class Message:
     def __init__(self, msg):
         split = msg.split()
         self.type = split[0]
+        payload = ' '.join(split[1:])
         try:
-            self.payload = loads(' '.join(split[1:]))
+            self.payload = loads(payload)
         except:
-            self.payload = split[1:]
+            self.payload = payload
 
     @classmethod
     def parse(cls, msg):
@@ -51,13 +52,15 @@ class Message:
 
     def __repr__(self):
         obj = self.__dict__.copy()
-        del obj['payload']
+        if type(self).__name__ != Message.__name__:
+            del obj['payload']
         return dumps(obj, default=lambda o: o.__dict__, ensure_ascii=False)
 
     @property
     def json(self):
         obj = self.__dict__.copy()
-        del obj['payload']
+        if type(self).__name__ != Message.__name__:
+            del obj['payload']
         return dumps(obj, default=lambda o: o.__dict__, indent=4, ensure_ascii=False)
 
 
