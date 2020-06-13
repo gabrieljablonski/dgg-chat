@@ -13,6 +13,25 @@ from ._utils import format_payload, bind_method
 from ._handler import DGGChatHandler
 
 
+class InvalidAuthTokenError(Exception):
+    def __init__(self, auth_token, message=''):
+        message = message or (
+            f"invalid auth token `{auth_token}`. it should be a 64 character alphanumeric string. "
+            'if you believe this is a mistake, set `validate_auth_token` to `False`'
+        )
+        super().__init__(message)
+
+
+class AnonymousConnectionError(Exception):
+    pass
+
+
+class InvalidMessageError(Exception):
+    def __init__(self, message=''):
+        message = message or 'message length should be in inclusive range [1, 512]'
+        super().__init__(message)
+
+
 class DumbFucksBeware(Exception):
     def __init__(self, message):
         super().__init__(
@@ -22,34 +41,32 @@ class DumbFucksBeware(Exception):
             "In any case, have a look at the source code."
         )
 
-
-class AnonymousConnectionError(Exception):
-    pass
-
-
+# TODO: retrieve unread messages
 class DGGChat:
     DGG_WS = 'wss://destiny.gg/ws'
     WAIT_BOOTSTRAP = 1  # in seconds
-    PRINT_MAX_LENGTH = 300
     # considering server throttle is 300ms and some network overhead
     THROTTLE_DELAY = .200  # in seconds
     # after this much time after last sent message, throttle factor is reset
     THROTTLE_RESET = 600  # in seconds
     # throttling should be a very exceptional case, so instead of starting at 1,
-    # adding a bit of padding to make sure it doesn't happen multiple times in a row
+    # a bit of padding ensures it doesn't happen multiple times in a row
     BASE_THROTTLE_FACTOR = 1.1
 
     def __init__(
-        self, auth_token=None, print_messages=False, 
+        self, auth_token=None, validate_auth_token=True,
         try_resend_on_throttle=True, on_close=None,
         on_any_message=None, on_served_connections=None, 
         on_user_joined=None, on_user_quit=None,
-        on_broadcast=None, on_chat_message=None, 
+        on_broadcast=None, on_chat_message=None,
         on_whisper=None, on_whisper_sent=None,
         on_mute=None, on_unmute=None, 
         on_ban=None, on_unban=None,
         on_sub_only=None, on_error_message=None,
     ):
+        if validate_auth_token and not self.auth_token_is_valid(auth_token):
+            raise InvalidAuthTokenError(auth_token)
+
         any_specific_handler_was_set = any([
             on_served_connections, on_user_joined, on_user_quit,
             on_broadcast, on_chat_message, on_whisper, on_whisper_sent, 
@@ -62,7 +79,6 @@ class DGGChat:
                 'can be set (aside from `on_close`)'
             )
 
-        self.print_messages = print_messages
         self.try_resend_on_throttle = try_resend_on_throttle
         
         self._running = False
@@ -79,16 +95,10 @@ class DGGChat:
         self._available_users_to_whisper = set()
 
         def _on_message(ws, message):
+            """The top level message handling function."""
             parsed = Message.parse(message)
             logging.debug(f"received message: `{message}`")
             logging.debug(f"parsed message: `{parsed}`")
-            if self.print_messages:
-                _msg = parsed.json
-                print('-'*30)
-                print('Received message:')
-                print(_msg[:self.PRINT_MAX_LENGTH])
-                print('...' if len(str(_msg)) > self.PRINT_MAX_LENGTH else '')
-                print('-'*30)
             if not self._unhandled_messages.empty() and parsed.type in (MessageTypes.ERROR, MessageTypes.WHISPER_SENT):
                 try:
                     payload = self._unhandled_messages.get_nowait()
@@ -118,15 +128,16 @@ class DGGChat:
                 self._available_users_to_whisper.add(parsed.user.nick)
             self._handler.on_any_message(self, parsed)
 
-        # websocket related errors (`on_error_message` is business related, i.e. `ERR` messages)
+        #  (`on_error_message` is business related, i.e. `ERR` messages)
         def _on_error(ws, error):
+            """Handler for websocket related errors."""
             msg = f"websocket error: `{error}`"
             logging.error(msg)
             raise WebSocketException(msg)
 
         def _on_close(ws):
-            logging.info('closing connection')
-            print('### connection closed ###')
+            self._running = False
+            logging.info('connection closed')
 
         on_close = on_close or _on_close
         
@@ -150,6 +161,14 @@ class DGGChat:
     @property
     def throttle_factor(self):
         return self._throttle_factor
+
+    @staticmethod
+    def auth_token_is_valid(token):
+        return len(token) == 64 and token.isalnum()
+
+    @staticmethod
+    def message_is_valid(msg):
+        return 0 < len(msg) <= 512
         
     def __enter__(self):
         self.connect()
@@ -202,6 +221,9 @@ class DGGChat:
         self._queued_messages.put(payload)
 
     def send_chat_message(self, message):
+        if not self.message_is_valid(message):
+            raise InvalidMessageError
+
         if not self._auth_token:
             logging.fatal("can't send chat message: anonymous connection")
             raise AnonymousConnectionError('`auth_token` must be informed to send chat messages')
@@ -212,6 +234,9 @@ class DGGChat:
         self._queue_message(MessageTypes.CHAT_MESSAGE, data=message)
 
     def send_whisper(self, user, message):
+        if not self.message_is_valid(message):
+            raise InvalidMessageError
+        
         if not self._auth_token:
             logging.fatal("can't send whisper: anonymous connection")
             raise AnonymousConnectionError('`auth_token` must be informed to send whispers')
