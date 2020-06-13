@@ -11,8 +11,8 @@ def setup_logger(level=logging.NOTSET):
         os.mkdir('logs')
     handler = RotatingFileHandler('logs/dgg.log', maxBytes=MAX_FILE_SIZE, backupCount=10, encoding='utf8')
     logging.basicConfig(
-        handlers=[handler],
+        handlers=[handler, logging.StreamHandler()],
         level=level,
-        format="[%(asctime)s] %(levelname)s [%(name)s.%(funcName)s:%(lineno)d] %(message)s",
+        format="[%(asctime)s.%(msecs)03d] %(levelname)s [%(name)s.%(funcName)s:%(lineno)d] %(message)s",
         datefmt='%Y-%m-%dT%H:%M:%S'
     )

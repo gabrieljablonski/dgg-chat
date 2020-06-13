@@ -27,7 +27,7 @@ class DGGChatWSHandler:
         if on_whisper:
             self.on_whisper = bind_method(on_whisper, self)
         if on_whisper_sent:
-            self.on_whisper_sent = bind_method(on_whisper_sent, self)
+            self.on_whisper_sent = bind_method(lambda ws, _: on_whisper_sent(ws), self)
         if on_mute:
             self.on_mute = bind_method(on_mute, self)
         if on_unmute:
