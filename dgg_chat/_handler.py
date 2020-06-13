@@ -1,3 +1,5 @@
+import logging
+
 from ._messages import MessageTypes
 from ._utils import bind_method
 
@@ -57,7 +59,7 @@ class DGGChatWSHandler:
         }
         if message.type in handler_mapping:
             return handler_mapping[message.type](ws, message)
-        print(f"message type `{message.type}` not handled: {message}")
+        logging.warning(f"message type `{message.type}` not handled: `{message}`")
 
     def on_served_connections(self, ws, message):
         pass
@@ -96,6 +98,4 @@ class DGGChatWSHandler:
         pass
     
     def on_error_message(self, ws, message):
-        print('*'*10)
-        print(message)
-        print('*'*10)
+        pass

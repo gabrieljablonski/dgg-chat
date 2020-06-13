@@ -50,11 +50,15 @@ class Message:
         return cls(msg)
 
     def __repr__(self):
-        return dumps(self, default=lambda o: o.__dict__, ensure_ascii=False)
+        obj = self.__dict__.copy()
+        del obj['payload']
+        return dumps(obj, default=lambda o: o.__dict__, ensure_ascii=False)
 
     @property
     def json(self):
-        return dumps(self, default=lambda o: o.__dict__, indent=4, ensure_ascii=False)
+        obj = self.__dict__.copy()
+        del obj['payload']
+        return dumps(obj, default=lambda o: o.__dict__, indent=4, ensure_ascii=False)
 
 
 class User:

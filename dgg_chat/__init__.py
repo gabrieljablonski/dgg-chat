@@ -1,3 +1,4 @@
+import logging
 from time import sleep
 from threading import Thread
 from websocket import WebSocketApp
@@ -5,6 +6,7 @@ from websocket import WebSocketApp
 from ._messages import Message, MessageTypes
 from ._utils import format_payload, bind_method
 from ._handler import DGGChatWSHandler
+from ._logger import setup_logger
 
 
 class AnonymousConnectionError(Exception):
@@ -14,7 +16,7 @@ class AnonymousConnectionError(Exception):
 class DGGChat:
     DGG_WS = 'wss://destiny.gg/ws'
     WAIT_BOOTSTRAP = 1  # in seconds
-    PRINT_MAX_LENGTH = 200
+    PRINT_MAX_LENGTH = 300
 
     def __init__(
         self, auth_token=None, print_messages=False, on_close=None,
@@ -39,18 +41,27 @@ class DGGChat:
             on_sub_only, on_error_message
         )
 
-        def _on_message(ws, msg):
-            message = Message.parse(msg)
+        def _on_message(ws, message):
+            parsed = Message.parse(message)
+            logging.debug(f"received message: `{message}`")
+            logging.debug(f"parsed message: `{parsed}`")
             if self.print_messages:
-                _msg = str(msg)
-                print(_msg[:self.PRINT_MAX_LENGTH], end='...\n' if len(str(_msg)) > self.PRINT_MAX_LENGTH else '\n')
-            self._handler.on_any_message(ws, message)
+                _msg = parsed.json
+                print('-'*30)
+                print('Received message:')
+                print(_msg[:self.PRINT_MAX_LENGTH])
+                print('...' if len(str(_msg)) > self.PRINT_MAX_LENGTH else '')
+                print('-'*30)
+            self._handler.on_any_message(ws, parsed)
 
         # websocket related errors (`on_error_message` is business related, i.e. `ERR` messages)
         def _on_error(ws, error):
-            print(f"error: {error}")
+            msg = f"websocket error: `{error}`"
+            logging.error(msg)
+            print(msg)
 
         def _on_close(ws):
+            logging.info('closing connection')
             print('### connection closed ###')
 
         on_close = on_close or _on_close
@@ -71,31 +82,40 @@ class DGGChat:
         self.disconnect()
         
     def connect(self, *args, **kwargs):
+        logging.info('setting up connection')
         t = Thread(target=self._ws.run_forever, args=args, kwargs=kwargs)
         t.start()
         sleep(self.WAIT_BOOTSTRAP)
+        logging.info('connected')
         self._running = True
         return t
 
     def disconnect(self):
+        logging.info('disconnecting')
         self._ws.close()
+        logging.info('disconnected')
         self._running = False
 
     def run_forever(self, *args, **kwargs):
         if self._running:
+            logging.fatal('chat already connected')
             raise ConnectionError('chat already connected, call `disconnect()` first')
+        logging.info('running websocket on loop')
         self._ws.run_forever(*args, **kwargs)
 
     def _send(self, type, **kwargs):
         payload = format_payload(type, **kwargs)
+        logging.debug(f"sending payload: `{payload}`")
         self._ws.send(payload)
 
     def send_chat_message(self, message):
         if not self._auth_token:
+            logging.fatal("can't send chat message: anonymous connection")
             raise AnonymousConnectionError('`auth_token` must be informed to send chat messages')
         self._send(MessageTypes.CHAT_MESSAGE, data=message)
 
     def send_whisper(self, user, message):
         if not self._auth_token:
+            logging.fatal("can't send whisper: anonymous connection")
             raise AnonymousConnectionError('`auth_token` must be informed to send whispers')
         self._send(MessageTypes.WHISPER, nick=user, data=message)
