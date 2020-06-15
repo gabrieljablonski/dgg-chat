@@ -24,7 +24,7 @@ Each handler receives a specific type of message.
 
 All defined message classes can be viewed in the [`messages`](./dgg_chat/messages/_messages.py) 
 module. The message type each handler should expect is defined by the 
-[`DGGChatHandler.mapping()`](./dgg_chat/handler/_handler.py#L30) property.
+[`DGGChatHandler().mapping()`](./dgg_chat/handler/_handler.py#L30) method.
 
 Overriding one of the predefined methods will effectively implement a custom handler. The chat 
 instance can be accessed via the `self.chat` attribute. A simple custom handler example follows:
@@ -47,7 +47,7 @@ instance can be accessed via the `self.chat` attribute. A simple custom handler 
 ```
 
 In case you don't use the default method names as defined in the `DGGChatHandler` base class, 
-the `self.mapping()` property must be overriden. Handlers not implemented don't need to be mapped, 
+the `self.mapping()` method must be overriden. Handlers not implemented don't need to be mapped, 
 **but if `self.mapping()` is overriden, you MUST reference ALL custom methods implemented.**
 
 ```python
@@ -102,7 +102,7 @@ Those are as follow:
 | `on_any_message()`    | Catch all handler, a message of any type just got received. The specific handler for that message type will still be called.                                            |
 | `on_mention()`        | Received a `ChatMessage` that contains the username for the authenticated user. Requires either `auth_token` or `session_id`. `on_chat_message()` will still be called. |
 | `on_ws_error()`       | Something wrong happened with the websocket connection.                                                                                                                 |
-| `on_ws_close()`       | Websocket connection got closed, usually by calling `DGGChat.disconnect()`.                                                                                              |
+| `on_ws_close()`       | Websocket connection got closed, usually by calling `DGGChat().disconnect()`.                                                                                              |
 
 These handlers can also be implemented with different names and remapped.
 
@@ -110,20 +110,20 @@ These handlers can also be implemented with different names and remapped.
 
 | Error Message | Explanation                                                                                                                                                            |
 |:-------------:|:----------------------------------------------------------------------------------------------------------------------------------------------------------------------:|
-| `"throttled"` | Messages got sent too fast with `DGGChat.send_chat_message()` or `DGGChat.send_whisper()`. See [limitations](#limitations).                                            |
+| `"throttled"` | Messages got sent too fast with `DGGChat().send_chat_message()` or `DGGChat().send_whisper()`. See [limitations](#limitations).                                            |
 | `"duplicate"` | The message just sent was identical to the last one.                                                                                                                   |
 | `"needlogin"` | Invalid `auth_token` or `session_login` provided. See [authentication](#authentication)                                                                                |
-| `"notfound"`  | Usually when target user for `DGGChat.send_whisper()` was not found.                                                                                                   |
+| `"notfound"`  | Usually when target user for `DGGChat().send_whisper()` was not found.                                                                                                   |
 
 ## `DGGChat`
 
 This is the class that runs the show. It will take the handler you've implemented and call its methods whenever 
 appropriate. The features listed below are available through it (though some are not usable right away):
 
-- Sending chat messages with `DGGChat.send_chat_message()`.
-- Sending whispers with `DGGChat.send_whisper()`.
-- View info for current user with `DGGChat.profile` property.
-- Get unread whispers with `DGGChat.get_unread_whispers()`.
+- Sending chat messages with `DGGChat().send_chat_message()`.
+- Sending whispers with `DGGChat().send_whisper()`.
+- View info for current user with `DGGChat().profile` property.
+- Get unread whispers with `DGGChat().get_unread_whispers()`.
 
 All of these features require the connection to be [authenticated](#authentication).
 
@@ -195,9 +195,9 @@ to do everything, but the API has been giving me some trouble.
 
 ## Extra Features
 
-- Use `DGGChat.api.info_stream()` to retrieve information about the stream if it's currently live,
+- Use `DGGChat().api.info_stream()` to retrieve information about the stream if it's currently live,
 or from the last stream.
-- Use `DGGCDN` (`from dgg_chat.cdn import DGGCDN`) to retrieve info about stuff like flairs and emotes from the CDN.
+- Use `DGGCDN()` (`from dgg_chat.cdn import DGGCDN`) to retrieve info about stuff like flairs and emotes from the CDN.
 
 ## Limitations
 
@@ -207,25 +207,6 @@ When sending whispers, on top of the websocket algorithm, you must be aware of t
 [website backend that handles private messages (#2)](https://github.com/destinygg/website/blob/master/lib/Destiny/Messages/PrivateMessageService.php#L23) 
 via the API, which is what is used by the websocket server when you whisper someone.
 
-The throttle #1 is dealt with in the [`DGGChat._handle_message()`](./dgg_chat/_dgg_chat.py#L241).
-The throttle #2 can be partially exploited via [this attribution]
-(https://github.com/destinygg/website/blob/master/lib/Destiny/Messages/PrivateMessageService.php#L64),
+The throttle #1 is dealt with in the [`DGGChat()._handle_message()`](./dgg_chat/_dgg_chat.py#L241) method.
+The throttle #2 can be partially exploited via [this attribution](https://github.com/destinygg/website/blob/master/lib/Destiny/Messages/PrivateMessageService.php#L64),
 by running a parallel conversation with an echo bot, i.e. on every whisper, also whisper the echo bot.
-
-Without any adjustments, assuming no replies nor messages read:
-
-- You're able to send a limit of 4 whispers to the same person within an hour.
-  - If the person replies, the only limitation on whispers sent to that person
-  will be #1 for the next hour.
-- You're able to send up to 22 whispers in total.
-  - Every whisper sent that was read adds 2 more possible whispers.
-  - Every whisper unrelated to a conversation received adds 2 more possible whispers.
-
-The problem with this scenario is that if you, for example, send 100 whispers to someone
-who replied, you won't be able to send whispers to anyone else if no other replies come through.
-
-Using the echo bot:
-
-- The single person conversation stays the same, unlimited upon reply.
-- You're able to send unlimited whispers in total, since upon every whisper, you can
-  gain one back (one used, two received) with the response by the echo bot.
