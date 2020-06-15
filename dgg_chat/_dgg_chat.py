@@ -288,7 +288,7 @@ class DGGChat:
     def update_profile(self):
         """Updates `self.me` with info from the auth token's account."""
 
-        if not self._me:
+        if not self._auth_token and not self._session_id:
             raise AnonymousConnectionError('unable to update profile')
 
         self._update_profile()
@@ -359,7 +359,7 @@ class DGGChat:
         if not self.message_is_valid(message):
             raise InvalidMessageError
 
-        if not self._auth_token:
+        if not self._auth_token and not self._session_id:
             raise AnonymousConnectionError('unable to send chat messages')
 
         if not self._running:
@@ -377,7 +377,7 @@ class DGGChat:
         if not self.message_is_valid(message):
             raise InvalidMessageError
 
-        if not self._auth_token:
+        if not self._auth_token and not self._session_id:
             raise AnonymousConnectionError('unable to send whispers')
 
         if self._me and self._me.nick == user:

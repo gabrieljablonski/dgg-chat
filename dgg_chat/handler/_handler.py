@@ -28,44 +28,35 @@ class DGGChatHandler:
         """
 
         return {
-            MessageTypes.SERVED_CONNECTIONS: 'on_served_connections',
-            MessageTypes.USER_JOINED: 'on_user_joined',
-            MessageTypes.USER_QUIT: 'on_user_quit',
-            MessageTypes.BROADCAST: 'on_broadcast',
-            MessageTypes.CHAT_MESSAGE: 'on_chat_message',
-            MessageTypes.WHISPER: 'on_whisper',
-            MessageTypes.WHISPER_SENT: 'on_whisper_sent',
-            MessageTypes.MUTE: 'on_mute',
-            MessageTypes.UNMUTE: 'on_unmute',
-            MessageTypes.BAN: 'on_ban',
-            MessageTypes.UNBAN: 'on_unban',
-            MessageTypes.SUB_ONLY: 'on_sub_only',
-            MessageTypes.ERROR: 'on_error_message',
-            MessageTypes.Special.ON_ANY_MESSAGE: 'on_any_message',
-            MessageTypes.Special.ON_MENTION: 'on_mention',
-            MessageTypes.Special.ON_WS_ERROR: 'on_ws_error',
-            MessageTypes.Special.ON_WS_CLOSE: 'on_ws_close',
+            MessageTypes.SERVED_CONNECTIONS: self.on_served_connections,
+            MessageTypes.USER_JOINED: self.on_user_joined,
+            MessageTypes.USER_QUIT: self.on_user_quit,
+            MessageTypes.BROADCAST: self.on_broadcast,
+            MessageTypes.CHAT_MESSAGE: self.on_chat_message,
+            MessageTypes.WHISPER: self.on_whisper,
+            MessageTypes.WHISPER_SENT: self.on_whisper_sent,
+            MessageTypes.MUTE: self.on_mute,
+            MessageTypes.UNMUTE: self.on_unmute,
+            MessageTypes.BAN: self.on_ban,
+            MessageTypes.UNBAN: self.on_unban,
+            MessageTypes.SUB_ONLY: self.on_sub_only,
+            MessageTypes.ERROR: self.on_error_message,
+            MessageTypes.Special.ON_ANY_MESSAGE: self.on_any_message,
+            MessageTypes.Special.ON_MENTION: self.on_mention,
+            MessageTypes.Special.ON_WS_ERROR: self.on_ws_error,
+            MessageTypes.Special.ON_WS_CLOSE: self.on_ws_close,
         }
 
-    def _get_handler(self, type):
-        handler_name = self.mapping()[type]
-        return getattr(self, handler_name)
-
-    def _try_call_handler(self, message):
-        if message.type not in self.mapping():
-            msg = f"message type `{message.type}` not supported by `{type(self).__name__}`"
+    def _try_call_handler(self, message_type, *args):
+        if message_type not in self.mapping():
+            msg = f"message type `{message_type}` not supported by `{type(self).__name__}`"
             logging.debug(msg)
             return
-        handler = self._get_handler(message.type)
-        if message.type == MessageTypes.WHISPER_SENT:
-            # whisper sent is the only regular handler that doesn't have a message (i.e. arity 1)
-            return handler()
-        else:
-            handler(message)
-
-    def handle_special(self, type, *args):
-        handler = self._get_handler(type)
+        handler = self.mapping()[message_type]
         handler(*args)
+
+    def handle_special(self, message_type, *args):
+        self._try_call_handler(message_type, *args)
 
     def handle_message(self, message: Message):
         self.handle_special(MessageTypes.Special.ON_ANY_MESSAGE, message)
@@ -82,7 +73,7 @@ class DGGChatHandler:
 
         try:
             self._try_call_handler(message)
-        except AttributeError:
+        except KeyError:
             if self.backup_handler:
                 self.backup_handler._try_call_handler(message)
 
@@ -90,20 +81,20 @@ class DGGChatHandler:
         """Called when receiving any message. Specific handler still called as usual."""
         pass
 
-    def on_served_connections(self, message: ServedConnections):
+    def on_served_connections(self, connections: ServedConnections):
         """
         Called when receiving the first message when a new connection is established,
         which lists all users connected and amount of connections currently served.
         """
         pass
 
-    def on_user_joined(self, message: UserJoined):
+    def on_user_joined(self, joined: UserJoined):
         pass
 
-    def on_user_quit(self, message: UserQuit):
+    def on_user_quit(self, quit: UserQuit):
         pass
 
-    def on_broadcast(self, message: Broadcast):
+    def on_broadcast(self, broadcast: Broadcast):
         """
         Called when receiving broadcasts (the yellow messages),
         such as when a user subscribes.
@@ -121,7 +112,7 @@ class DGGChatHandler:
         """
         pass
 
-    def on_whisper(self, message: Whisper):
+    def on_whisper(self, whisper: Whisper):
         pass
 
     def on_whisper_sent(self):
