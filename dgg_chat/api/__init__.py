@@ -1,8 +1,9 @@
 import logging
 from json import loads
 from datetime import datetime
-from requests import get, post
+from requests import get
 
+from ._cdn import DGGCDN
 from ._user import User
 from ._stream_info import StreamInfo
 from ._private_message import PrivateMessage
@@ -27,11 +28,11 @@ class DGGAPI:
         cookies = dict(authtoken=self._auth_token, sid=self._session_id)
 
         r = get(endpoint, cookies=cookies)
-        if r.status_code == 200:
-            logging.info(f"received from api: `{r.content.decode()}`")
-            return loads(r.content) if as_json else r.content
-
-        raise APIError(f"failed to call `{endpoint}`: {r.status_code} `{r.content.decode()}`")
+        if r.status_code != 200:
+            raise APIError(endpoint, r)
+        
+        logging.info(f"received from api: `{r.content.decode()}`")
+        return loads(r.content) if as_json else r.content
 
     def user_info(self):
         if not self._auth_token:

@@ -19,6 +19,7 @@ from .handler import DGGChatHandler
 from .api import DGGAPI, User
 from ._utils import format_payload
 
+
 class DGGChat:
     """
     A dgg chat API.    

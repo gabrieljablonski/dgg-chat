@@ -10,8 +10,7 @@ class InvalidAuthTokenError(Exception):
 
 
 class AnonymousConnectionError(Exception):
-    def __init__(self, message=''):
-        message = message or 'connection is anonymous'
+    def __init__(self, message='connection is anonymous'):
         message = f"{message}: no auth token provided"
 
         logging.warning(message)
@@ -20,8 +19,7 @@ class AnonymousConnectionError(Exception):
 
 
 class AnonymousSessionError(Exception):
-    def __init__(self, message=''):
-        message = message or 'session is anonymous'
+    def __init__(self, message='session is anonymous'):
         message = f"{message}: no session id provided"
 
         logging.warning(message)
@@ -49,7 +47,12 @@ class DumbFucksBeware(Exception):
 
 
 class APIError(Exception):
-    def __init__(self, message=''):
+    def __init__(self, endpoint, response):
+        message = f"failed to call `{endpoint}`: {response.status_code} `{response.content.decode()}`"
         logging.warning(message)
+        super().__init__(message)
 
+
+class CDNError(Exception):
+    def __init__(self, message='CDN error'):
         super().__init__(message)
