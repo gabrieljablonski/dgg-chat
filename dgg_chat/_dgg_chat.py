@@ -59,7 +59,7 @@ class DGGChat:
 
     def __init__(
         self, auth_token=None, validate_auth_token=True,
-        handler=None, try_resend_on_throttle=True, 
+        handler: DGGChatHandler = None, try_resend_on_throttle=True, 
         *,
         on_close=None, on_any_message=None, 
         on_served_connections=None, 
@@ -85,6 +85,8 @@ class DGGChat:
         if auth_token and validate_auth_token and not self.auth_token_is_valid(auth_token):
             raise InvalidAuthTokenError(auth_token)
         self._auth_token = auth_token
+        self.me: User = self._update_profile() if auth_token else None
+
         self.try_resend_on_throttle = try_resend_on_throttle
         self._running = False
 
@@ -137,7 +139,7 @@ class DGGChat:
             on_error_message=on_error_message,
         )
         
-        self._handler = DGGChatHandler(**handlers)
+        self._handler = DGGChatHandler(backup_handler=handler, **handlers)
 
         self._ws = WebSocketApp(
             self.DGG_WS,
@@ -166,6 +168,9 @@ class DGGChat:
     def message_is_valid(msg):
         return 0 < len(msg) <= 512
 
+    def set_handler(self, handler: DGGChatHandler):
+        handler.backup_handler = self._handler
+        self._handler = handler
         
 
     def _handle_message(self, message):
