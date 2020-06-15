@@ -82,7 +82,7 @@ class DGGChat:
         self._throttle_factor = self.BASE_THROTTLE_FACTOR
 
         self._queued_messages = Queue()
-        self._unhandled_messages = Queue(maxsize=1)
+        self._unhandled_messages = Queue()
 
         self._available_users_to_whisper = set()
 
@@ -211,18 +211,15 @@ class DGGChat:
         logging.debug(f"enqueueing payload: `{payload}`")
         self._queued_messages.put(payload)
 
-    def connect(self, *args, **kwargs):
+    def connect(self):
         """Connect to chat and run in a new thread (non-blocking)."""
         if self._running:
             raise ConnectionError('chat is already connected')
         logging.info('setting up connection')
-        t = Thread(target=self._ws.run_forever, daemon=True, args=args, kwargs=kwargs)
+        t = Thread(target=self.run_forever, daemon=True)
         t.start()
         time.sleep(self.WAIT_BOOTSTRAP)
         logging.info('connected')
-
-        self._running = True
-        self._start_send_loop()
         return t
 
     def disconnect(self):
@@ -233,14 +230,15 @@ class DGGChat:
         logging.info('disconnected')
         self._running = False
 
-    def run_forever(self, *args, **kwargs):
+    def run_forever(self):
         """Connect to chat and blocks the thread."""
         if self._running:
             logging.fatal('chat already connected')
             raise ConnectionError('chat already connected, call `disconnect()` first')
         logging.info('running websocket on loop')
         self._running = True
-        self._ws.run_forever(*args, **kwargs)
+        self._start_send_loop()
+        self._ws.run_forever()
     
     def send_chat_message(self, message):
         if not self.message_is_valid(message):

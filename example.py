@@ -39,8 +39,7 @@ def on_broadcast(c: DGGChat, msg):
     print(f"Something interesting just happened: {msg.content}")
 
 def on_chat_message(c: DGGChat, msg):
-    # print(f"{msg.user.nick} just said: {msg.content}")
-    pass
+    print(f"{msg.user.nick} just said: {msg.content}")
 
 def on_whisper(c: DGGChat, msg):
     print(f"Just received a message from {msg.user.nick}: {msg.content}")
@@ -78,7 +77,7 @@ def on_error_message(c: DGGChat, msg: Message):
     print(f"something went trying to reach the chat: `{msg.payload}`")
 
 
-setup_logger(DEBUG)
+setup_logger(WARNING)
 
 load_dotenv(verbose=True)
 dgg_auth_token = getenv('DGG_AUTH_TOKEN')
