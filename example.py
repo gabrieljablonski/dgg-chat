@@ -14,12 +14,10 @@ from dgg_chat.messages import (
     ModerationMessage,
     SubOnly
 )
-from dgg_chat.logger import setup_logger, DEBUG, INFO
+from dgg_chat.logger import setup_logger, DEBUG, INFO, WARNING
 
 
 def on_any_message(c: DGGChat, msg: Message):
-    # overriding the internal handler will make it so
-    # each message type has to be handled manually
     if msg.type == MessageTypes.BROADCAST:
         print(f"received a broadcast: `{msg.content}`")
     if msg.type == MessageTypes.ERROR:
@@ -41,7 +39,8 @@ def on_broadcast(c: DGGChat, msg):
     print(f"Something interesting just happened: {msg.content}")
 
 def on_chat_message(c: DGGChat, msg):
-    print(f"{msg.user.nick} just said: {msg.content}")
+    # print(f"{msg.user.nick} just said: {msg.content}")
+    pass
 
 def on_whisper(c: DGGChat, msg):
     print(f"Just received a message from {msg.user.nick}: {msg.content}")
@@ -86,7 +85,7 @@ dgg_auth_token = getenv('DGG_AUTH_TOKEN')
 
 chat = DGGChat(
     auth_token=dgg_auth_token,
-    # on_any_message=on_any_message,
+    on_any_message=on_any_message,
     on_served_connections=on_served_connections,
     on_user_joined=on_user_joined,
     on_user_quit=on_user_quit,
@@ -104,7 +103,6 @@ chat = DGGChat(
 
 while chat.run_forever(): 
     pass
-
 
 ## if you don't mind manually reconnecting in case of a sudden disconnect,
 ## the chat handler can be run in the background like this:

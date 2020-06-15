@@ -18,7 +18,7 @@ from ._utils import bind_method
 
 class DGGChatHandler:
     def __init__(
-        self, backup_handler=None, suppress_not_implemented=True,
+        self, 
         *,
         on_any_message=None, on_served_connections=None, 
         on_user_joined=None, on_user_quit=None,
@@ -28,8 +28,7 @@ class DGGChatHandler:
         on_ban=None, on_unban=None,
         on_sub_only=None, on_error_message=None
     ):
-        self.backup_handler = backup_handler
-        self.suppress_not_implemented = suppress_not_implemented
+        self.backup_handler = None
         if on_any_message:
             self.on_any_message = bind_method(on_any_message, self)
         if on_served_connections:
@@ -60,7 +59,7 @@ class DGGChatHandler:
             self.on_error_message = bind_method(on_error_message, self)
 
     @property
-    def handler_mapping(self):
+    def mapping(self):
         return {
             MessageTypes.SERVED_CONNECTIONS: 'on_served_connections',
             MessageTypes.USER_JOINED: 'on_user_joined',
@@ -77,78 +76,85 @@ class DGGChatHandler:
             MessageTypes.ERROR: 'on_error_message',
         }
 
-    def _try_call_message_handler(self, chat, message):
-        handler_name = self.handler_mapping[message.type]
+    def _try_call_handler(self, chat, message):
+        handler_name = self.mapping[message.type]
         handler = getattr(self, handler_name)
-        try:
-            return handler(chat, message)
-        except NotImplementedError:
-            if self.suppress_not_implemented:
-                pass
-
-    def on_any_message(self, chat, message: Message):
         if message.type == MessageTypes.WHISPER_SENT:
             # whisper sent is the only handler that doesn't have a message (i.e. arity 1)
-            return self.on_whisper_sent(chat)
+            return handler(chat)
+        else:
+            handler(chat, message)
 
-        handled_message_types = set(*self.handler_mapping.keys())
+    def handle_message(self, chat, message):
+        self.on_any_message(chat, message)
+
+        handled_message_types = set(self.mapping.keys())
         if self.backup_handler:
-            handled_message_types.update(self.backup_handler.handler_mapping)
+            handled_message_types.update(self.backup_handler.mapping)
 
         if message.type not in handled_message_types:
             logging.warning(f"message type `{message.type}` not handled: `{message}`")
             logging.debug(f"handled message types: {handled_message_types}")
             return
 
-        self._try_call_message_handler(chat, message)
-        if self.backup_handler:
-            self.backup_handler._try_call_message_handler(chat, message)
+        try:
+            self._try_call_handler(chat, message)
+        except AttributeError:
+            if self.backup_handler:
+                self.backup_handler._try_call_handler(chat, message)
+
+    def on_any_message(self, chat, message: Message):
+        """Called when receiving any message. Specific handler still called as usual."""
+        pass
         
     def on_served_connections(self, chat, message: ServedConnections):
         """
-        The first message received when a new connection is established.
-        Lists all users connected and amount of connections currently served.
+        Called when receiving the first message when a new connection is established,
+        which lists all users connected and amount of connections currently served.
         """
-        raise NotImplementedError
+        pass
 
     def on_user_joined(self, chat, message: UserJoined):
-        raise NotImplementedError
+        pass
 
     def on_user_quit(self, chat, message: UserQuit):
-        raise NotImplementedError
+        pass
 
     def on_broadcast(self, chat, message: Broadcast):
-        """Received on broadcasts (the yellow messages), such as when a user subscribes."""
-        raise NotImplementedError
+        """
+        Called when receiving broadcasts (the yellow messages),
+        such as when a user subscribes.
+        """
+        pass
 
     def on_chat_message(self, chat, message: ChatMessage):
-        raise NotImplementedError
+        pass
 
     def on_whisper(self, chat, message: Whisper):
-        raise NotImplementedError
+        pass
 
     def on_whisper_sent(self, chat):
-        """A confirmation message that a whisper was successfully sent."""
-        raise NotImplementedError
+        """Called on confirmation messages that a whisper was successfully sent."""
+        pass
 
     def on_mute(self, chat, message: ModerationMessage):
-        raise NotImplementedError
+        pass
 
     def on_unmute(self, chat, message: ModerationMessage):
-        raise NotImplementedError
+        pass
 
     def on_ban(self, chat, message: ModerationMessage):
-        raise NotImplementedError
+        pass
 
     def on_unban(self, chat, message: ModerationMessage):
-        raise NotImplementedError
+        pass
 
     def on_sub_only(self, chat, message: SubOnly):
-        raise NotImplementedError
+        pass
     
     def on_error_message(self, chat, message: Message):
         """
-        An error message when something goes wrong, 
+        Called on an error message when something goes wrong, 
         such as when sending a whisper to a user that doesn't exist.
         """
-        raise NotImplementedError
+        pass

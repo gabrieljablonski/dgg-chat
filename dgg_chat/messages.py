@@ -1,5 +1,6 @@
 from json import loads, dumps
 
+from ._user import User
 
 class MessageTypes:
     SERVED_CONNECTIONS = 'NAMES'
@@ -64,36 +65,26 @@ class Message:
         return dumps(obj, default=lambda o: o.__dict__, indent=4, ensure_ascii=False)
 
 
-class User:
-    def __init__(self, msg):
-        self.nick = msg.get('nick')
-        self.features = msg.get('features')
-
-    @property
-    def is_subbed(self):
-        return "subscribed" in self.features
-
-
 class ServedConnections(Message):
     def __init__(self, msg):
         super().__init__(msg)
         self.count = self.payload.get('connectioncount')
         self.users = [
-            User(u) for u in self.payload.get('users')
+            User.from_ws_messsage(u) for u in self.payload.get('users')
         ]
 
 
 class UserJoined(Message):
     def __init__(self, msg):
         super().__init__(msg)
-        self.user = User(self.payload)
+        self.user = User.from_ws_messsage(self.payload)
         self.timestamp = self.payload.get('timestamp')
 
 
 class UserQuit(Message):
     def __init__(self, msg):
         super().__init__(msg)
-        self.user = User(self.payload)
+        self.user = User.from_ws_messsage(self.payload)
         self.timestamp = self.payload.get('timestamp')
 
 
@@ -107,7 +98,7 @@ class Broadcast(Message):
 class ChatMessage(Message):
     def __init__(self, msg):
         super().__init__(msg)
-        self.user = User(self.payload)
+        self.user = User.from_ws_messsage(self.payload)
         self.timestamp = self.payload.get('timestamp')
         self.content = self.payload.get('data')
 
@@ -115,7 +106,7 @@ class ChatMessage(Message):
 class Whisper(Message):
     def __init__(self, msg):
         super().__init__(msg)
-        self.user = User(self.payload)
+        self.user = User.from_ws_messsage(self.payload)
         self.message_id = self.payload.get('messageid')
         self.timestamp = self.payload.get('timestamp')
         self.content = self.payload.get('data')
@@ -124,7 +115,7 @@ class Whisper(Message):
 class ModerationMessage(Message):
     def __init__(self, msg):
         super().__init__(msg)
-        self.moderator = User(self.payload)
+        self.moderator = User.from_ws_messsage(self.payload)
         self.timestamp = self.payload.get('timestamp')
         user, *sentence = self.payload.get('data').split()
         self.affected_user = user
@@ -134,7 +125,7 @@ class ModerationMessage(Message):
 class SubOnly(Message):
     def __init__(self, msg):
         super().__init__(msg)
-        self.moderator = User(self.payload)
+        self.moderator = User.from_ws_messsage(self.payload)
         self.timestamp = self.payload.get('timestamp')
         # on or off
         self.mode = self.payload.get('data')

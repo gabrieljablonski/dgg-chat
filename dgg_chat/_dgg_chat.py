@@ -3,13 +3,12 @@ import logging
 import queue
 from os import getenv
 from queue import Queue
-from sched import scheduler
 from threading import Thread
 from websocket import WebSocketApp
 from websocket._exceptions import WebSocketException
 
 from .messages import Message, MessageTypes
-from ._handler import DGGChatHandler
+from .handler import DGGChatHandler
 from ._utils import format_payload, bind_method
 from ._user import User
 
@@ -70,18 +69,6 @@ class DGGChat:
         on_ban=None, on_unban=None,
         on_sub_only=None, on_error_message=None,
     ):
-        any_specific_handler_was_set = any([
-            on_served_connections, on_user_joined, on_user_quit,
-            on_broadcast, on_chat_message, on_whisper, on_whisper_sent, 
-            on_mute, on_unmute, on_ban, on_unban, 
-            on_sub_only, on_error_message
-        ])
-        if on_any_message != None and any_specific_handler_was_set:
-            raise ValueError(
-                'if `on_any_message` is provided, no other `on_` event '
-                'can be set (aside from `on_close`)'
-            )
-
         if auth_token and validate_auth_token and not self.auth_token_is_valid(auth_token):
             raise InvalidAuthTokenError(auth_token)
         self._auth_token = auth_token
@@ -109,7 +96,7 @@ class DGGChat:
             if parsed.type == MessageTypes.WHISPER:
                 self._available_users_to_whisper.add(parsed.user.nick)
                 logging.info(f"{parsed.user.nick} added to users available to whisper")
-            self._handler.on_any_message(self, parsed)
+            self._handler.handle_message(self, parsed)
 
         #  (`on_error_message` is business related, i.e. `ERR` messages)
         def _on_error(ws, error):
@@ -138,8 +125,11 @@ class DGGChat:
             on_sub_only=on_sub_only,
             on_error_message=on_error_message,
         )
-        
-        self._handler = DGGChatHandler(backup_handler=handler, **handlers)
+
+        self._handler = DGGChatHandler(**handlers)
+        if handler:
+            handler.backup_handler = self._handler
+            self._handler = handler
 
         self._ws = WebSocketApp(
             self.DGG_WS,
@@ -249,6 +239,7 @@ class DGGChat:
             logging.fatal('chat already connected')
             raise ConnectionError('chat already connected, call `disconnect()` first')
         logging.info('running websocket on loop')
+        self._running = True
         self._ws.run_forever(*args, **kwargs)
     
     def send_chat_message(self, message):
