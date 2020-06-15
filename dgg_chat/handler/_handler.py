@@ -19,7 +19,6 @@ class DGGChatHandler:
         self.chat = chat
         self.backup_handler = None
 
-    @property
     def mapping(self):
         """
         Should be overridden if your custom handler implements any method
@@ -42,27 +41,38 @@ class DGGChatHandler:
             MessageTypes.UNBAN: 'on_unban',
             MessageTypes.SUB_ONLY: 'on_sub_only',
             MessageTypes.ERROR: 'on_error_message',
+            MessageTypes.Special.ON_ANY_MESSAGE: 'on_any_message',
+            MessageTypes.Special.ON_MENTION: 'on_mention',
+            MessageTypes.Special.ON_WS_ERROR: 'on_ws_error',
+            MessageTypes.Special.ON_WS_CLOSE: 'on_ws_close',
         }
 
+    def _get_handler(self, type):
+        handler_name = self.mapping()[type]
+        return getattr(self, handler_name)
+
     def _try_call_handler(self, message):
-        if message.type not in self.mapping:
+        if message.type not in self.mapping():
             msg = f"message type `{message.type}` not supported by `{type(self).__name__}`"
             logging.debug(msg)
             return
-        handler_name = self.mapping[message.type]
-        handler = getattr(self, handler_name)
+        handler = self._get_handler(message.type)
         if message.type == MessageTypes.WHISPER_SENT:
-            # whisper sent is the only handler that doesn't have a message (i.e. arity 1)
+            # whisper sent is the only regular handler that doesn't have a message (i.e. arity 1)
             return handler()
         else:
             handler(message)
 
-    def handle_message(self, message: Message):
-        self.on_any_message(message)
+    def handle_special(self, type, *args):
+        handler = self._get_handler(type)
+        handler(*args)
 
-        handled_message_types = set(self.mapping.keys())
+    def handle_message(self, message: Message):
+        self.handle_special(MessageTypes.Special.ON_ANY_MESSAGE, message)
+
+        handled_message_types = set(self.mapping().keys())
         if self.backup_handler:
-            handled_message_types.update(self.backup_handler.mapping)
+            handled_message_types.update(self.backup_handler.mapping())
 
         if message.type not in handled_message_types:
             msg = f"message type `{message.type}` not handled: `{message}`"

@@ -145,7 +145,7 @@ class DGGChat:
                 logging.info(msg)
 
             if self._me and parsed.type == MessageTypes.CHAT_MESSAGE and self._me.nick in parsed.content:
-                self._handler.on_mention(parsed)
+                self._handler.handle_special(MessageTypes.Special.ON_MENTION, parsed)
 
             self._handler.handle_message(parsed)
             if parsed.type == MessageTypes.WHISPER and self.mark_as_read:
@@ -155,7 +155,7 @@ class DGGChat:
         def on_error(ws, error):
             """Handler for websocket related errors."""
 
-            self._handler.on_ws_error(error)
+            self._handler.handle_special(MessageTypes.Special.ON_WS_ERROR, error)
 
             msg = f"websocket error: `{error}`"
 
@@ -165,7 +165,7 @@ class DGGChat:
         def on_close(ws):
             """Handler for when the websocket connection is closed."""
 
-            self._handler.on_ws_close()
+            self._handler.handle_special(MessageTypes.Special.ON_WS_CLOSE)
             self._running = False
 
             logging.info('connection closed')

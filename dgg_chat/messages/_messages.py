@@ -16,6 +16,12 @@ class MessageTypes:
     SUB_ONLY = 'SUBONLY'
     ERROR = 'ERR'
 
+    class Special:
+        ON_ANY_MESSAGE = 'ON_ANY_MESSAGE'
+        ON_MENTION = 'ON_MENTION'
+        ON_WS_ERROR = 'ON_WS_ERROR'
+        ON_WS_CLOSE = 'ON_WS_CLOSE'
+
     @staticmethod
     def is_moderation_message(msg_type):
         return msg_type in (MessageTypes.MUTE, MessageTypes.UNMUTE, MessageTypes.BAN, MessageTypes.UNBAN)
