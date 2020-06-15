@@ -53,6 +53,10 @@ class DGGChatHandler:
             logging.debug(msg)
             return
         handler = self.mapping()[message_type]
+
+        if message_type == MessageTypes.WHISPER_SENT:
+            handler()
+            return
         handler(*args)
 
     def handle_special(self, message_type, *args):
@@ -72,10 +76,10 @@ class DGGChatHandler:
             return
 
         try:
-            self._try_call_handler(message)
+            self._try_call_handler(message.type, message)
         except KeyError:
             if self.backup_handler:
-                self.backup_handler._try_call_handler(message)
+                self.backup_handler._try_call_handler(message.type, message)
 
     def on_any_message(self, message: Message):
         """Called when receiving any message. Specific handler still called as usual."""
@@ -108,7 +112,7 @@ class DGGChatHandler:
         """
         Called when a chat message contains the current user's name.
         It's not called by the handler, but by the `DGGChat` instance,
-        so it doesn't need to be mapped. `on_chat_message` is still called.
+        so it doesn't need to be mapped. `on_chat_message()` is still called.
         """
         pass
 

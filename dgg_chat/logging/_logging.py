@@ -17,6 +17,7 @@ def setup_logger(level=logging.NOTSET):
     logging.basicConfig(
         handlers=[handler, logging.StreamHandler()],
         level=level,
-        format="[%(asctime)s.%(msecs)03d] %(levelname)s [%(name)s.%(funcName)s:%(lineno)d] %(message)s",
+        format=u"[%(asctime)s.%(msecs)03d] %(levelname)s [%(name)s.%(funcName)s:%(lineno)d] %(message)s",
         datefmt='%Y-%m-%dT%H:%M:%S'
     )
+    logging._defaultFormatter = logging.Formatter(u"%(message)s")

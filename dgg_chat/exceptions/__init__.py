@@ -3,7 +3,8 @@ from ._exceptions import (
     AnonymousConnectionError,
     AnonymousSessionError,
     DumbFucksBeware,
+    CDNError,
     InvalidAuthTokenError,
+    InvalidHandlerError,
     InvalidMessageError,
-    CDNError
 )

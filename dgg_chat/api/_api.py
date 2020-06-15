@@ -15,6 +15,7 @@ class DGGAPI:
     def __init__(self, auth_token=None, session_id=None):
         self._auth_token = auth_token
         self._session_id = session_id
+        self._profile: User = None
 
     @property
     def auth_token(self):
@@ -37,14 +38,16 @@ class DGGAPI:
         if not self._auth_token:
             raise AnonymousConnectionError('unable to get profile')
         user = self._get(f"/userinfo?token={self._auth_token}")
-        return User.from_api_response(user)
+        self._profile = User.from_api_response(user)
+        return self._profile
 
     def chat_me(self):
         if not self._auth_token:
             raise AnonymousSessionError('unable to get profile')
 
         user = self._get('/chat/me')
-        return User.from_api_response(user)
+        self._profile = User.from_api_response(user)
+        return self._profile
 
     def chat_history(self):
         """
@@ -65,25 +68,43 @@ class DGGAPI:
 
         unread = self._get('/messages/unread')
         return {
-            m.get('username'): m.get('unread')
+            m.get('username'): int(m.get('unread'))
             for m in unread
         }
 
-    def messages_inbox(self, user, offset=0):
+    def _get_inbox(self, user, offset=0, received_only=True):
+        inbox = self._get(f"/messages/usr/{user}/inbox?s={offset}")
+
+        messages = []
+        for m in inbox:
+            pm = PrivateMessage.from_api_response(m)
+            # should be false when `pm_is_read` OR when `received_only` AND `nick` != `target`
+            if not pm.is_read and not (received_only and self._profile.nick != pm.target_user):
+                messages.append(pm)
+        return messages
+
+    def messages_inbox(self, user, count=25, offset=0, received_only=True):
         """
-        Returns a list of last 25 `PrivateMessages` exchanged with `user`.
-        `offset` can be user to retrieve older messages.
+        Returns a list of the last `count` `PrivateMessages` exchanged with `user`.
+        `offset` can be user to skip to older messages.
         This marks messages as read.
         """
 
         if not self._session_id:
             raise AnonymousSessionError('unable to get inbox')
 
-        inbox = self._get(f"/messages/usr/{user}/inbox?s={offset}")
-        return [
-            PrivateMessage.from_api_response(m)
-            for m in inbox
-        ]
+        messages = []
+        while True:
+            inbox = self._get_inbox(user, offset, received_only=True)
+            if not len(inbox):
+                break
+            messages.extend(inbox[:count])
+            if len(inbox) >= count:
+                break
+            count -= len(inbox)
+            offset += len(inbox)
+            
+        return messages
 
     def info_stream(self):
         """Returns info about current stream if live, or last stream."""

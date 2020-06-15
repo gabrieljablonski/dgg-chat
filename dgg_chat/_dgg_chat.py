@@ -8,11 +8,12 @@ from websocket import WebSocketApp
 from websocket._exceptions import WebSocketException
 
 from .exceptions import (
-    DumbFucksBeware,
-    InvalidMessageError,
-    InvalidAuthTokenError,
     AnonymousConnectionError,
-    AnonymousSessionError
+    AnonymousSessionError,
+    DumbFucksBeware,
+    InvalidAuthTokenError,
+    InvalidHandlerError,
+    InvalidMessageError,
 )
 from .messages import Message, MessageTypes, ChatUser
 from .handler import DGGChatHandler
@@ -75,6 +76,7 @@ class DGGChat:
         `handle_unread_whispers` : `bool`
 
             whether unread whispers should be handled. requires `session_id` to work.
+            handlers are called before connecting.
             `False` by default.
 
         `mark_as_read` : `bool`
@@ -114,13 +116,18 @@ class DGGChat:
         self._handler = DGGChatHandler(self)
 
         if handler:
+            if not isinstance(handler, DGGChatHandler):
+                raise InvalidHandlerError(
+                    f"{type(handler).__name__} is not a subclass of {DGGChatHandler.__name__}"
+                )
+
             handler.chat = self
             handler.backup_handler = self._handler
             self._handler = handler
 
-        self._api = DGGAPI(auth_token)
+        self._api = DGGAPI(auth_token, session_id)
 
-        self._me = self._update_profile() if auth_token else None
+        self._profile = self._update_profile() if auth_token else None
 
         if handle_unread_whispers:
             self._handle_unread_whispers()
@@ -144,12 +151,12 @@ class DGGChat:
                 msg = f"{parsed.user.nick} added to users available to whisper"
                 logging.info(msg)
 
-            if self._me and parsed.type == MessageTypes.CHAT_MESSAGE and self._me.nick in parsed.content:
+            if self._profile and parsed.type == MessageTypes.CHAT_MESSAGE and self._profile.nick in parsed.content:
                 self._handler.handle_special(MessageTypes.Special.ON_MENTION, parsed)
 
             self._handler.handle_message(parsed)
             if parsed.type == MessageTypes.WHISPER and self.mark_as_read:
-                self.mark_all_as_read(parsed.user)
+                self.mark_all_as_read(parsed.user.nick)
 
         #  `on_error_message` is business related, i.e. `ERR` messages
         def on_error(ws, error):
@@ -190,8 +197,12 @@ class DGGChat:
         return self._throttle_factor
 
     @property
-    def me(self):
-        return self._me
+    def profile(self):
+        return self._profile
+
+    @property
+    def api(self):
+        return self._api
 
     @staticmethod
     def auth_token_is_valid(token):
@@ -202,8 +213,8 @@ class DGGChat:
         return 0 < len(msg) <= 512
 
     def _update_profile(self):
-        self._me = self._api.user_info()
-        logging.info(f"profile updated: {self._me}")
+        self._profile = self._api.user_info()
+        logging.info(f"profile updated: {self._profile}")
 
     def _handle_history(self):
         """Handles the 150 most recent chat messages up until chat is connected."""
@@ -225,8 +236,7 @@ class DGGChat:
         unread = self.get_unread_whispers()
         for user, whispers in unread.items():
             for whisper in whispers:
-                if whisper.target_user == self._me.nick:
-                    self._handler.handle_message(whisper.as_websocket_message)
+                self._handler.handle_message(whisper.as_websocket_message)
 
     def _handle_message(self, message):
         try:
@@ -262,10 +272,9 @@ class DGGChat:
         Thread(target=self._send_loop, daemon=True).start()
 
     def _send_loop(self):
+        time.sleep(self.WAIT_BOOTSTRAP)
+        self._running = True
         while True:
-            while not self._unhandled_messages.empty():
-                continue
-
             while not self._next_message_time or time.time() < self._next_message_time:
                 continue
 
@@ -286,17 +295,25 @@ class DGGChat:
         self._queued_messages.put(payload)
 
     def update_profile(self):
-        """Updates `self.me` with info from the auth token's account."""
+        """
+        Updates `self.profile` with info from the auth token's account.
+        Useful on flair or subscriber status changes.
+        """
 
         if not self._auth_token and not self._session_id:
             raise AnonymousConnectionError('unable to update profile')
 
         self._update_profile()
 
-    def get_unread_whispers(self, from_user=None):
+    def mark_all_as_read(self, from_user=None):
+        # TODO: implement more efficiently (user `/messages/inbox|read` endpoints)
+        self.get_unread_whispers(from_user=from_user)
+
+    def get_unread_whispers(self, from_user=None, received_only=True):
         """
         Retrieves all unread whispers. Includes the messages sent to the user.
-        All of them are marked as read.
+        When `received_only` is `True`, messages sent are filtered out,
+        returning only those received. All messages are marked as read.
         """
 
         if not self._session_id:
@@ -307,13 +324,13 @@ class DGGChat:
 
         if from_user:
             if from_user in unread:
-                messages[from_user] = self._api.messages_inbox(from_user)
+                messages[from_user] = self._api.messages_inbox(from_user, unread[from_user])
             else:
                 messages[from_user] = []
             return messages
 
         for user, count in unread.items():
-            messages[user] = self._api.messages_inbox(user)
+            messages[user] = self._api.messages_inbox(user, count)
 
         return messages
 
@@ -349,7 +366,6 @@ class DGGChat:
             raise ConnectionError(msg)
 
         logging.info('running websocket on loop')
-        self._running = True
         self._start_send_loop()
 
         while self._ws.run_forever():
@@ -362,15 +378,12 @@ class DGGChat:
         if not self._auth_token and not self._session_id:
             raise AnonymousConnectionError('unable to send chat messages')
 
-        if not self._running:
-            raise ConnectionError('chat is not connected')
-
         enabled = str(getenv('DGG_ENABLE_CHAT_MESSAGES')).lower()
         if not enabled or enabled in ('none', 'false'):
             msg = 'sending chat messages is currently disabled'
             raise DumbFucksBeware(msg)
 
-        logging.info('sending chat message')
+        logging.info('queue send chat message')
         self._queue_message(MessageTypes.CHAT_MESSAGE, data=message)
 
     def send_whisper(self, user, message):
@@ -380,16 +393,13 @@ class DGGChat:
         if not self._auth_token and not self._session_id:
             raise AnonymousConnectionError('unable to send whispers')
 
-        if self._me and self._me.nick == user:
+        if self._profile and self._profile.nick == user:
             raise ValueError("you can't whisper yourself, you silly goose")
-
-        if not self._running:
-            raise ConnectionError('chat is not connected')
 
         enabled = str(getenv('DGG_ENABLE_WHISPER_FIRST')).lower()
         if (not enabled or enabled in ('none', 'false')) and user not in self._available_users_to_whisper:
             msg = 'whispers can only be sent to users who whispered you in this session'
             raise DumbFucksBeware(msg)
 
-        logging.info('sending whisper')
+        logging.info('queue send whisper')
         self._queue_message(MessageTypes.WHISPER, nick=user, data=message)

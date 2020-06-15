@@ -45,8 +45,8 @@ class PrivateMessage:
     def as_websocket_message(self):
         payload = {
             'messageid': self.id,
-            'nick': self.target_user,
-            'timestamp': self.date_time,
+            'nick': self.from_user,
+            'timestamp': int(1000*self.date_time.timestamp()),
             'data': self.content,
         }
         msg = f"{MessageTypes.WHISPER} {dumps(payload, ensure_ascii=False)}"
