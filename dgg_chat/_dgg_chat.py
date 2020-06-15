@@ -9,8 +9,9 @@ from websocket import WebSocketApp
 from websocket._exceptions import WebSocketException
 
 from .messages import Message, MessageTypes
-from ._utils import format_payload, bind_method
 from ._handler import DGGChatHandler
+from ._utils import format_payload, bind_method
+from ._user import User
 
 
 class InvalidAuthTokenError(Exception):
@@ -23,7 +24,10 @@ class InvalidAuthTokenError(Exception):
 
 
 class AnonymousConnectionError(Exception):
-    pass
+    def __init__(self, message=''):
+        message = message or 'connection is anonymous'
+        message = f"{message}: no auth token provided"
+        super().__init__(message)
 
 
 class InvalidMessageError(Exception):
@@ -55,8 +59,10 @@ class DGGChat:
 
     def __init__(
         self, auth_token=None, validate_auth_token=True,
-        try_resend_on_throttle=True, on_close=None,
-        on_any_message=None, on_served_connections=None, 
+        handler=None, try_resend_on_throttle=True, 
+        *,
+        on_close=None, on_any_message=None, 
+        on_served_connections=None, 
         on_user_joined=None, on_user_quit=None,
         on_broadcast=None, on_chat_message=None,
         on_whisper=None, on_whisper_sent=None,
@@ -64,9 +70,6 @@ class DGGChat:
         on_ban=None, on_unban=None,
         on_sub_only=None, on_error_message=None,
     ):
-        if validate_auth_token and not self.auth_token_is_valid(auth_token):
-            raise InvalidAuthTokenError(auth_token)
-
         any_specific_handler_was_set = any([
             on_served_connections, on_user_joined, on_user_quit,
             on_broadcast, on_chat_message, on_whisper, on_whisper_sent, 
@@ -79,10 +82,11 @@ class DGGChat:
                 'can be set (aside from `on_close`)'
             )
 
-        self.try_resend_on_throttle = try_resend_on_throttle
-        
-        self._running = False
+        if auth_token and validate_auth_token and not self.auth_token_is_valid(auth_token):
+            raise InvalidAuthTokenError(auth_token)
         self._auth_token = auth_token
+        self.try_resend_on_throttle = try_resend_on_throttle
+        self._running = False
 
         self._last_message_time = 0
         self._next_message_time = time.time()
@@ -90,7 +94,6 @@ class DGGChat:
 
         self._queued_messages = Queue()
         self._unhandled_messages = Queue(maxsize=1)
-        Thread(target=self._send_loop, daemon=True).start()
 
         self._available_users_to_whisper = set()
 
@@ -98,34 +101,12 @@ class DGGChat:
             """The top level message handling function."""
             parsed = Message.parse(message)
             logging.debug(f"received message: `{message}`")
-            logging.debug(f"parsed message: `{parsed}`")
+            logging.info(f"parsed message: `{parsed}`")
             if not self._unhandled_messages.empty() and parsed.type in (MessageTypes.ERROR, MessageTypes.WHISPER_SENT):
-                try:
-                    payload = self._unhandled_messages.get_nowait()
-                except queue.Empty as e:
-                    logging.fatal('unhandled messages queue was empty')
-                    raise e
-                now = time.time()
-                if now >= self._last_message_time + self.THROTTLE_RESET:
-                    logging.info('resetting throttle factor')
-                    self._throttle_factor = self.BASE_THROTTLE_FACTOR
-                if parsed.type == MessageTypes.ERROR:
-                    # max throttle factor seems to be 16 (16*.3=5s)
-                    # verified empirically since this doesn't match the source code (https://github.com/destinygg/chat/blob/master/connection.go#L407)
-                    if parsed.payload == 'throttled':
-                        logging.warning('connection throttled')
-                        self._throttle_factor = min(16, 2*self._throttle_factor)
-                        if self.try_resend_on_throttle:
-                            # default behaviour when throttled is to try and resend
-                            self._queued_messages.put(payload)
-                    if parsed.payload == 'duplicate':
-                        logging.warning('duplicate message')
-                        self._throttle_factor = min(16, 1+self._throttle_factor)
-                else:
-                    self._last_message_time = now
-                self._next_message_time = now + self._throttle_factor*self.THROTTLE_DELAY
+                self._handle_message(parsed)
             if parsed.type == MessageTypes.WHISPER:
                 self._available_users_to_whisper.add(parsed.user.nick)
+                logging.info(f"{parsed.user.nick} added to users available to whisper")
             self._handler.on_any_message(self, parsed)
 
         #  (`on_error_message` is business related, i.e. `ERR` messages)
@@ -140,15 +121,23 @@ class DGGChat:
             logging.info('connection closed')
 
         on_close = on_close or _on_close
-        
-        self._handler = DGGChatHandler(
-            on_any_message, on_served_connections, 
-            on_user_joined, on_user_quit,
-            on_broadcast, on_chat_message, 
-            on_whisper, on_whisper_sent,
-            on_mute, on_unban, on_ban, on_unban,
-            on_sub_only, on_error_message
+
+        handlers = dict(
+            on_any_message=on_any_message,
+            on_served_connections=on_served_connections,
+            on_user_joined=on_user_joined,
+            on_user_quit=on_user_quit,
+            on_broadcast=on_broadcast,
+            on_chat_message=on_chat_message,
+            on_whisper=on_whisper,
+            on_whisper_sent=on_whisper_sent,
+            on_mute=on_mute, on_unmute=on_unmute,
+            on_ban=on_ban, on_unban=on_unban,
+            on_sub_only=on_sub_only,
+            on_error_message=on_error_message,
         )
+        
+        self._handler = DGGChatHandler(**handlers)
 
         self._ws = WebSocketApp(
             self.DGG_WS,
@@ -157,7 +146,14 @@ class DGGChat:
             on_close=on_close,
             cookie=f"authtoken={self._auth_token}" if self._auth_token else None
         )
+        
+    def __enter__(self):
+        self.connect()
+        return self
 
+    def __exit__(self, type, value, traceback):
+        self.disconnect()
+        
     @property
     def throttle_factor(self):
         return self._throttle_factor
@@ -169,39 +165,37 @@ class DGGChat:
     @staticmethod
     def message_is_valid(msg):
         return 0 < len(msg) <= 512
+
         
-    def __enter__(self):
-        self.connect()
-        return self
 
-    def __exit__(self, type, value, traceback):
-        self.disconnect()
-        
-    def connect(self, *args, **kwargs):
-        if self._running:
-            raise ConnectionError('chat is already connected')
-        logging.info('setting up connection')
-        t = Thread(target=self._ws.run_forever, daemon=True, args=args, kwargs=kwargs)
-        t.start()
-        time.sleep(self.WAIT_BOOTSTRAP)
-        logging.info('connected')
-        self._running = True
-        return t
+    def _handle_message(self, message):
+        try:
+            payload = self._unhandled_messages.get_nowait()
+        except queue.Empty as e:
+            logging.fatal('unhandled messages queue was empty')
+            raise e
+        now = time.time()
+        if now >= self._last_message_time + self.THROTTLE_RESET:
+            logging.info('resetting throttle factor')
+            self._throttle_factor = self.BASE_THROTTLE_FACTOR
+        if message.type == MessageTypes.ERROR:
+            # max throttle factor seems to be 16 (16*.3=5s)
+            # verified empirically since this doesn't match the source code (https://github.com/destinygg/chat/blob/master/connection.go#L407)
+            if message.payload == 'throttled':
+                logging.warning('connection throttled')
+                self._throttle_factor = min(16, 2*self._throttle_factor)
+                if self.try_resend_on_throttle:
+                    # default behaviour when throttled is to try and resend
+                    self._queued_messages.put(payload)
+            if message.payload == 'duplicate':
+                logging.warning('duplicate message')
+                self._throttle_factor = min(16, 1 + self._throttle_factor)
+        else:
+            self._last_message_time = now
+        self._next_message_time = now + self._throttle_factor*self.THROTTLE_DELAY
 
-    def disconnect(self):
-        if not self._running:
-            raise ConnectionError('chat is not connected')
-        logging.info('disconnecting')
-        self._ws.close()
-        logging.info('disconnected')
-        self._running = False
-
-    def run_forever(self, *args, **kwargs):
-        if self._running:
-            logging.fatal('chat already connected')
-            raise ConnectionError('chat already connected, call `disconnect()` first')
-        logging.info('running websocket on loop')
-        self._ws.run_forever(*args, **kwargs)
+    def _start_send_loop(self):
+        Thread(target=self._send_loop, daemon=True).start()
 
     def _send_loop(self):
         while True:
@@ -209,6 +203,8 @@ class DGGChat:
                 continue
             while not self._next_message_time or time.time() < self._next_message_time:
                 continue
+            if not self._running:
+                break
             self._next_message_time = 0
             payload = self._queued_messages.get()
             logging.debug(f"sending payload: `{payload}`")
@@ -220,28 +216,63 @@ class DGGChat:
         logging.debug(f"enqueueing payload: `{payload}`")
         self._queued_messages.put(payload)
 
+    def connect(self, *args, **kwargs):
+        """Connect to chat and run in a new thread (non-blocking)."""
+        if self._running:
+            raise ConnectionError('chat is already connected')
+        logging.info('setting up connection')
+        t = Thread(target=self._ws.run_forever, daemon=True, args=args, kwargs=kwargs)
+        t.start()
+        time.sleep(self.WAIT_BOOTSTRAP)
+        logging.info('connected')
+
+        self._running = True
+        self._start_send_loop()
+        return t
+
+    def disconnect(self):
+        if not self._running:
+            raise ConnectionError('chat is not connected')
+        logging.info('disconnecting')
+        self._ws.close()
+        logging.info('disconnected')
+        self._running = False
+
+    def run_forever(self, *args, **kwargs):
+        """Connect to chat and blocks the thread."""
+        if self._running:
+            logging.fatal('chat already connected')
+            raise ConnectionError('chat already connected, call `disconnect()` first')
+        logging.info('running websocket on loop')
+        self._ws.run_forever(*args, **kwargs)
+    
     def send_chat_message(self, message):
         if not self.message_is_valid(message):
             raise InvalidMessageError
-
         if not self._auth_token:
-            logging.fatal("can't send chat message: anonymous connection")
-            raise AnonymousConnectionError('`auth_token` must be informed to send chat messages')
+            logging.fatal('unable to send chat message: anonymous connection')
+            raise AnonymousConnectionError('unable to send chat messages')
+        if not self._running:
+            raise ConnectionError('chat is not connected')
+
         enabled = str(getenv('DGG_ENABLE_CHAT_MESSAGES')).lower()
         if not enabled or enabled in ('none', 'false'):
-            raise DumbFucksBeware("sending chat messages is currently disabled")
+            raise DumbFucksBeware('sending chat messages is currently disabled')
         logging.info('sending chat message')
         self._queue_message(MessageTypes.CHAT_MESSAGE, data=message)
 
     def send_whisper(self, user, message):
         if not self.message_is_valid(message):
             raise InvalidMessageError
-        
         if not self._auth_token:
-            logging.fatal("can't send whisper: anonymous connection")
-            raise AnonymousConnectionError('`auth_token` must be informed to send whispers')
+            logging.fatal('unable to send whisper: anonymous connection')
+            raise AnonymousConnectionError('unable to send whispers')
+        if self.me and self.me.nick == user:
+            raise ValueError("you can't whisper yourself, you silly goose")
+        if not self._running:
+            raise ConnectionError('chat is not connected')
         logging.info('sending whisper')
         enabled = str(getenv('DGG_ENABLE_WHISPER_FIRST')).lower()
         if (not enabled or enabled in ('none', 'false')) and user not in self._available_users_to_whisper:
-            raise DumbFucksBeware("whispers can only be sent to users who whispered you first this session")
+            raise DumbFucksBeware('whispers can only be sent to users who whispered you in this session')
         self._queue_message(MessageTypes.WHISPER, nick=user, data=message)
