@@ -195,7 +195,7 @@ to do everything, but the API has been giving me some trouble.
 
 ## Extra Features
 
-- Use `DGGChat().api.info_stream()` to retrieve information about the stream if it's currently live,
+- Use `DGGChat().api.info_stream()` (or `from dgg_chat.api import DGGAPI`) to retrieve information about the stream if it's currently live,
 or from the last stream.
 - Use `DGGCDN()` (`from dgg_chat.cdn import DGGCDN`) to retrieve info about stuff like flairs and emotes from the CDN.
 

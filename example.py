@@ -72,7 +72,7 @@ class CustomHandlerWithCustomNames(DGGChatHandler):
         print('connection closed')
 
 
-setup_logger(INFO)
+setup_logger(DEBUG)
 
 load_dotenv(verbose=True)
 dgg_auth_token = getenv('DGG_AUTH_TOKEN')
@@ -81,7 +81,7 @@ handler = CustomHandler()
 # handler = CustomHandlerWithCustomNames()
 chat = DGGChat(
     auth_token=dgg_auth_token,
-    handler=handler,
+    # handler=handler,
 )
 
 # default way of running (blocking)

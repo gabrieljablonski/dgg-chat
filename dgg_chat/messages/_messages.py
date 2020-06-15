@@ -96,20 +96,20 @@ class UserJoined(Message):
     def __init__(self, msg):
         super().__init__(msg)
         self.user = ChatUser.from_ws_messsage(self.payload)
-        self.timestamp = self.payload.get('timestamp')
+        self.timestamp = self.payload.get('timestamp')/1000.
 
 
 class UserQuit(Message):
     def __init__(self, msg):
         super().__init__(msg)
         self.user = ChatUser.from_ws_messsage(self.payload)
-        self.timestamp = self.payload.get('timestamp')
+        self.timestamp = self.payload.get('timestamp')/1000.
 
 
 class Broadcast(Message):
     def __init__(self, msg):
         super().__init__(msg)
-        self.timestamp = self.payload.get('timestamp')
+        self.timestamp = self.payload.get('timestamp')/1000.
         self.content = self.payload.get('data')
 
 
@@ -117,7 +117,7 @@ class ChatMessage(Message):
     def __init__(self, msg):
         super().__init__(msg)
         self.user = ChatUser.from_ws_messsage(self.payload)
-        self.timestamp = self.payload.get('timestamp')
+        self.timestamp = self.payload.get('timestamp')/1000.
         self.content = self.payload.get('data')
 
 
@@ -126,7 +126,7 @@ class Whisper(Message):
         super().__init__(msg)
         self.user = ChatUser.from_ws_messsage(self.payload)
         self.message_id = self.payload.get('messageid')
-        self.timestamp = self.payload.get('timestamp')
+        self.timestamp = self.payload.get('timestamp')/1000.
         self.content = self.payload.get('data')
 
 
@@ -134,7 +134,7 @@ class ModerationMessage(Message):
     def __init__(self, msg):
         super().__init__(msg)
         self.moderator = ChatUser.from_ws_messsage(self.payload)
-        self.timestamp = self.payload.get('timestamp')
+        self.timestamp = self.payload.get('timestamp')/1000.
         user, *sentence = self.payload.get('data').split()
         self.affected_user = user
         self.sentence = ' '.join(sentence)
@@ -144,6 +144,6 @@ class SubOnly(Message):
     def __init__(self, msg):
         super().__init__(msg)
         self.moderator = ChatUser.from_ws_messsage(self.payload)
-        self.timestamp = self.payload.get('timestamp')
+        self.timestamp = self.payload.get('timestamp')/1000.
         # on or off
         self.mode = self.payload.get('data')
