@@ -11,7 +11,7 @@ from ..exceptions import APIError, AnonymousConnectionError, AnonymousSessionErr
 
 class DGGAPI:
     DGG_API = 'https://www.destiny.gg/api'
-    
+
     def __init__(self, auth_token=None, session_id=None):
         self._auth_token = auth_token
         self._session_id = session_id
@@ -29,7 +29,7 @@ class DGGAPI:
         r = get(endpoint, cookies=cookies)
         if r.status_code != 200:
             raise APIError(endpoint, r)
-        
+
         logging.info(f"received from api: `{r.content.decode()}`")
         return loads(r.content) if as_json else r.content
 

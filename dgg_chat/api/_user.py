@@ -16,7 +16,9 @@ class User:
         self.status = status
         self.auth_provider = auth_provider
         self.country = country  # currently not supported
-        self.created_date = datetime.strptime(created_date, '%Y-%m-%dT%H:%M:%S+0000') if created_date else None
+        self.created_date = datetime.strptime(
+            created_date, '%Y-%m-%dT%H:%M:%S+0000'
+        ) if created_date else None
         self.features = features
         self.roles = roles
         self.settings = settings

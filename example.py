@@ -18,7 +18,8 @@ class CustomHandler(DGGChatHandler):
         print(f"{message.user.nick} just said: {message.content}")
 
     def on_whisper(self, message: Whisper):
-        print(f"Just received a message from {message.user.nick}: {message.content}")
+        print(
+            f"Just received a message from {message.user.nick}: {message.content}")
         self.chat.send_whisper(message.user.nick, 'Hello!')
 
     def on_whisper_sent(self):
@@ -42,13 +43,15 @@ class CustomHandlerWithCustomNames(DGGChatHandler):
         }
 
     def on_served_connections(self, message: ServedConnections):
-        print(f"There are {message.count} connections and {len(message.users)} users online.")
+        print(
+            f"There are {message.count} connections and {len(message.users)} users online.")
 
     def on_chat(self, message: ChatMessage):
         print(f"{message.user.nick} just said: {message.content}")
 
     def on_private(self, message: Whisper):
-        print(f"Just received a message from {message.user.nick}: {message.content}")
+        print(
+            f"Just received a message from {message.user.nick}: {message.content}")
         self.chat.send_whisper(message.user.nick, 'Hello!')
 
     def on_private_sent(self):
@@ -61,6 +64,7 @@ class CustomHandlerWithCustomNames(DGGChatHandler):
     # does not need to be mapped!
     def on_ws_close(self):
         print('connection closed')
+
 
 setup_logger(INFO)
 
@@ -78,7 +82,7 @@ chat = DGGChat(
 
 chat.run_forever()
 
-## can also be run in parallel (non-blocking)
+# can also be run in parallel (non-blocking)
 
 # chat.connect()
 # do_stuff()

@@ -24,7 +24,7 @@ class DGGChatHandler:
         """
         Should be overridden if your custom handler implements any method
         with a different method from the ones listed below.
-        
+
         Handlers not implemented don't need to be mapped.
         """
 
@@ -46,7 +46,8 @@ class DGGChatHandler:
 
     def _try_call_handler(self, message):
         if message.type not in self.mapping:
-            logging.debug(f"message type `{message.type}` not supported by `{type(self).__name__}`")
+            msg = f"message type `{message.type}` not supported by `{type(self).__name__}`"
+            logging.debug(msg)
             return
         handler_name = self.mapping[message.type]
         handler = getattr(self, handler_name)
@@ -64,7 +65,8 @@ class DGGChatHandler:
             handled_message_types.update(self.backup_handler.mapping)
 
         if message.type not in handled_message_types:
-            logging.warning(f"message type `{message.type}` not handled: `{message}`")
+            msg = f"message type `{message.type}` not handled: `{message}`"
+            logging.warning(msg)
             logging.debug(f"handled message types: {handled_message_types}")
             return
 
@@ -77,7 +79,7 @@ class DGGChatHandler:
     def on_any_message(self, message: Message):
         """Called when receiving any message. Specific handler still called as usual."""
         pass
-        
+
     def on_served_connections(self, message: ServedConnections):
         """
         Called when receiving the first message when a new connection is established,
@@ -130,7 +132,7 @@ class DGGChatHandler:
 
     def on_sub_only(self, message: SubOnly):
         pass
-    
+
     def on_error_message(self, message: Message):
         """
         Called on an error message when something goes wrong, 
@@ -145,7 +147,6 @@ class DGGChatHandler:
         so it doesn't need to be mapped.
         """
         pass
-
 
     def on_ws_close(self):
         """

@@ -1,6 +1,6 @@
 class StreamInfo:
     def __init__(
-        self, 
+        self,
         started_at, ended_at, duration,
         viewers, game, host, live,
         preview, status_text

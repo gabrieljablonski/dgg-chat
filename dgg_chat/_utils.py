@@ -28,5 +28,5 @@ def dict_keys_camel_to_snake_case(d):
     snaked = d.copy()
     for key in d:
         new_key = camel_to_snake_case(key)
-        snaked[new_key] = snaked.pop(key) 
+        snaked[new_key] = snaked.pop(key)
     return snaked
