@@ -27,14 +27,14 @@ class DGGChat:
     """
 
     DGG_WS = 'wss://destiny.gg/ws'
-    WAIT_BOOTSTRAP = 1  # in seconds
+    WAIT_WS_BOOTSTRAP = 1  # in seconds
     # considering server throttle is 300ms and some network overhead
-    THROTTLE_DELAY = .200  # in seconds
+    WS_THROTTLE_DELAY = .200  # in seconds
     # after this much time after last sent message, throttle factor is reset
-    THROTTLE_RESET = 600  # in seconds
+    WS_THROTTLE_RESET = 600  # in seconds
     # throttling should be a very exceptional case, so instead of starting at 1,
     # a bit of padding ensures it doesn't happen multiple times in a row
-    BASE_THROTTLE_FACTOR = 1.1
+    BASE_WS_THROTTLE_FACTOR = 1.1
 
     def __init__(
         self, handler: DGGChatHandler = None,
@@ -43,7 +43,7 @@ class DGGChat:
         handle_history=False,
         handle_unread_whispers=False,
         mark_as_read=False,
-        try_resend_on_throttle=True
+        anti_throttle_bot='',
     ):
         """
         Parameters
@@ -87,11 +87,10 @@ class DGGChat:
             requires `session_id` to work.
             `False` by default.
 
-        `try_resend_on_throttle` : `bool`
+        `anti_throttle_bot` : `str`
 
-            whether to try to resend a chat message or whisper when it fails because of throttling.
-            if disabled, resending can be done in the `on_error_message()` handler.
-            `True` by default.
+            the chat nick for a echo bot connected in chat.
+            used to bypass throttling limits.
         """
 
         if auth_token and validate_auth_token and not self.auth_token_is_valid(auth_token):
@@ -101,12 +100,11 @@ class DGGChat:
         self._session_id = session_id
 
         self.mark_as_read = mark_as_read
-        self.try_resend_on_throttle = try_resend_on_throttle
-
         self._running = False
         self._last_message_time = 0
         self._next_message_time = time.time()
-        self._throttle_factor = self.BASE_THROTTLE_FACTOR
+        self._ws_throttle_factor = self.BASE_WS_THROTTLE_FACTOR
+        self._anti_throttle_bot = anti_throttle_bot
 
         self._queued_messages = Queue()
         self._unhandled_messages = Queue()
@@ -194,7 +192,7 @@ class DGGChat:
 
     @property
     def throttle_factor(self):
-        return self._throttle_factor
+        return self._ws_throttle_factor
 
     @property
     def profile(self):
@@ -246,33 +244,30 @@ class DGGChat:
             raise e
 
         now = time.time()
-        if now >= self._last_message_time + self.THROTTLE_RESET:
+        if now >= self._last_message_time + self.WS_THROTTLE_RESET:
             logging.info('resetting throttle factor')
-            self._throttle_factor = self.BASE_THROTTLE_FACTOR
+            self._ws_throttle_factor = self.BASE_WS_THROTTLE_FACTOR
 
         if message.type == MessageTypes.ERROR:
             # max throttle factor seems to be 16 (16*.3=5s)
-            # verified empirically since this doesn't match the source code (https://github.com/destinygg/chat/blob/master/connection.go#L407)
+            # verified empirically since this doesn't seem to match the source code (https://github.com/destinygg/chat/blob/master/connection.go#L407)
             if message.payload == 'throttled':
                 logging.warning('connection throttled')
-                self._throttle_factor = min(16, 2*self._throttle_factor)
-                if self.try_resend_on_throttle:
-                    # default behaviour when throttled is to try and resend
-                    self._queued_messages.put(payload)
+                self._ws_throttle_factor = min(16, 2*self._ws_throttle_factor)
 
             if message.payload == 'duplicate':
                 logging.warning('duplicate message')
-                self._throttle_factor = min(16, 1 + self._throttle_factor)
+                self._ws_throttle_factor = min(16, 1 + self._ws_throttle_factor)
         else:
             self._last_message_time = now
 
-        self._next_message_time = now + self._throttle_factor*self.THROTTLE_DELAY
+        self._next_message_time = now + self._ws_throttle_factor*self.WS_THROTTLE_DELAY
 
     def _start_send_loop(self):
         Thread(target=self._send_loop, daemon=True).start()
 
     def _send_loop(self):
-        time.sleep(self.WAIT_BOOTSTRAP)
+        time.sleep(self.WAIT_WS_BOOTSTRAP)
         self._running = True
         while True:
             while not self._next_message_time or time.time() < self._next_message_time:
@@ -288,6 +283,15 @@ class DGGChat:
 
             self._ws.send(payload)
             self._unhandled_messages.put(payload)
+
+            if self._anti_throttle_bot:
+                anti_throttle_payload = format_payload(
+                    MessageTypes.WHISPER, nick=self._anti_throttle_bot, data='0'
+                )
+                logging.debug(f"anti-throttle payload: `{anti_throttle_payload}`")
+
+                self._ws.send(anti_throttle_payload)
+                self._unhandled_messages.put(anti_throttle_payload)
 
     def _queue_message(self, type, **kwargs):
         payload = format_payload(type, **kwargs)
@@ -344,7 +348,7 @@ class DGGChat:
         t = Thread(target=self.run_forever, daemon=True)
         t.start()
 
-        time.sleep(self.WAIT_BOOTSTRAP)
+        time.sleep(self.WAIT_WS_BOOTSTRAP)
         logging.info('connected')
         return t
 
