@@ -1,6 +1,6 @@
 import logging
 
-from .messages import (
+from ..messages import (
     MessageTypes,
     Message,
     ServedConnections,

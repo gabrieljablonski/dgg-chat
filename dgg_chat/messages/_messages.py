@@ -1,5 +1,6 @@
 from json import loads, dumps
 
+
 class MessageTypes:
     SERVED_CONNECTIONS = 'NAMES'
     USER_JOINED = 'JOIN'

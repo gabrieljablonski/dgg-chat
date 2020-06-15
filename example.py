@@ -10,7 +10,7 @@ from dgg_chat.messages import (
     Whisper,
 )
 from dgg_chat.handler import DGGChatHandler
-from dgg_chat.logger import setup_logger, WARNING, INFO, DEBUG
+from dgg_chat.logging import setup_logger, WARNING, INFO, DEBUG
 
 
 class CustomHandler(DGGChatHandler):
@@ -72,14 +72,13 @@ handler = CustomHandler()
 chat = DGGChat(
     auth_token=dgg_auth_token,
     handler=handler,
-    handle_history=True,
 )
 
 # default way of running (blocking)
 
 chat.run_forever()
 
-# can also be run in parallel (non-blocking)
+## can also be run in parallel (non-blocking)
 
 # chat.connect()
 # do_stuff()

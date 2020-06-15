@@ -1,5 +1,6 @@
 import logging
 
+
 class InvalidAuthTokenError(Exception):
     def __init__(self, auth_token, message=''):
         message = message or (
