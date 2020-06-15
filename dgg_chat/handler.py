@@ -77,6 +77,9 @@ class DGGChatHandler:
         }
 
     def _try_call_handler(self, chat, message):
+        if message.type not in self.mapping:
+            logging.debug(f"message type `{message.type}` not supported by `{type(self).__name__}`")
+            return
         handler_name = self.mapping[message.type]
         handler = getattr(self, handler_name)
         if message.type == MessageTypes.WHISPER_SENT:
