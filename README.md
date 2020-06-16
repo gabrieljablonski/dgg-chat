@@ -198,11 +198,13 @@ to do everything, but the API has been giving me some trouble.
 - Use `DGGChat().api.info_stream()` (or `from dgg_chat.api import DGGAPI`) to retrieve information about the stream if it's currently live,
 or from the last stream.
 - Use `DGGCDN()` (`from dgg_chat.cdn import DGGCDN`) to retrieve info about stuff like flairs and emotes from the CDN.
+- Use `DGGLogs` (`from dgg_chat.logs import DGGLogs`) to retrieve chat logs.
 
 ## Limitations
 
 As some would expect, the chat server offers some resistence to spamming messages.
-When sending messages in chat, you must know of [websocket server throttling algorithm (#1)](https://github.com/destinygg/chat/blob/master/connection.go#L400).
+When sending messages in chat, you must know of [websocket server throttling algorithm (#1)](https://github.com/destinygg/chat/blob/master/connection.go#L400),
+as well as the chat bot that takes care of spam, but unless you plan on intentionally spamming, no need to worry about it.
 When sending whispers, on top of the websocket algorithm, you must be aware of the
 [website backend that handles private messages (#2)](https://github.com/destinygg/website/blob/master/lib/Destiny/Messages/PrivateMessageService.php#L23) 
 via the API, which is what is used by the websocket server when you whisper someone.

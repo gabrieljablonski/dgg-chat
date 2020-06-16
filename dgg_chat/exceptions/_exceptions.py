@@ -3,7 +3,7 @@ import logging
 
 class APIError(Exception):
     def __init__(self, endpoint, response):
-        message = f"failed to call `{endpoint}`: {response.status_code} `{response.content.decode()}`"
+        message = f"failed to call `{endpoint}`: {response.status_code} `{response.content.decode('utf8')}`"
         logging.warning(message)
         super().__init__(message)
 
@@ -48,6 +48,11 @@ class InvalidAuthTokenError(Exception):
             'if you believe this is a mistake, set `validate_auth_token` to `False`'
         )
         super().__init__(message)
+
+
+class InvalidChatLine(Exception):
+    def __init__(self, line):
+        super().__init__(line)
 
 
 class InvalidHandlerError(Exception):

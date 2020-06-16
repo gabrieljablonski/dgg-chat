@@ -29,13 +29,13 @@ class DGGCDN:
         if r.status_code != 200:
             raise APIError(DGG, r)
 
-        content = r.content.decode()
-        matches = findall(self.PATTERN, content)
+        content = r.content.decode('utf8')
+        match = findall(self.PATTERN, content)
 
-        if not matches:
+        if not match:
             raise CDNError('failed to find cache key and cdn url')
 
-        self.cache_key, self.cdn = matches[0]
+        self.cache_key, self.cdn = match[0]
 
         logging.info(f"setup cdn: {self.cdn} cache key: {self.cache_key}")
 
@@ -47,7 +47,7 @@ class DGGCDN:
         logging.info(f"retrieving: {url}")
         r = get(url, allow_redirects=False)
 
-        logging.info(f"retrieved: {r.content.decode()[:200]}")
+        logging.info(f"retrieved: {r.content.decode('utf8')[:200]}")
 
         if r.status_code in (301, 404):
             raise FileNotFoundError(object_path)
@@ -56,7 +56,7 @@ class DGGCDN:
             raise APIError(url, r)
 
         if as_json:
-            return loads(r.content.decode())
+            return loads(r.content.decode('utf8'))
 
         return r.content
 

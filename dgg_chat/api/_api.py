@@ -31,7 +31,7 @@ class DGGAPI:
         if r.status_code != 200:
             raise APIError(endpoint, r)
 
-        logging.info(f"received from api: `{r.content.decode()}`")
+        logging.info(f"received from api: `{r.content.decode('utf8')}`")
         return loads(r.content) if as_json else r.content
 
     def user_info(self):
