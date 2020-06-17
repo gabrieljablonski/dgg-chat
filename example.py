@@ -26,6 +26,12 @@ def on_any_message(message: Message):
     print(f"from `on_any_message()`: {message}")
 
 
+# multiple handlers can be used for the same event
+@chat.on_any_message
+def alt_on_any_message(message: Message):
+    ...
+
+
 @chat.on_served_connections
 def on_served_connections(connections: ServedConnections):
     print(
@@ -33,6 +39,7 @@ def on_served_connections(connections: ServedConnections):
     )
 
 
+# the same handler can be used for multiple events
 @chat.on_whisper
 @chat.on_chat_message
 def on_chat_or_whisper(message: Message):
