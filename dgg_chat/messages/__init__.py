@@ -1,5 +1,5 @@
 from ._messages import (
-    MessageTypes,
+    EventTypes,
     ChatUser,
     Message,
     ServedConnections,

@@ -1,8 +1,9 @@
 from json import dumps
 from datetime import datetime
 
-from ..messages import MessageTypes, Message
+from ..messages import Message
 from .._utils import dict_swap_keys
+from .._event_types import EventTypes
 
 
 class PrivateMessage:
@@ -49,5 +50,5 @@ class PrivateMessage:
             'timestamp': int(1000*self.date_time.timestamp()),
             'data': self.content,
         }
-        msg = f"{MessageTypes.WHISPER} {dumps(payload, ensure_ascii=False)}"
+        msg = f"{EventTypes.WHISPER} {dumps(payload, ensure_ascii=False)}"
         return Message.parse(msg)

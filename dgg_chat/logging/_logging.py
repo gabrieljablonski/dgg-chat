@@ -7,15 +7,15 @@ from logging.handlers import RotatingFileHandler
 MAX_FILE_SIZE = 10*int(2**20)  # 10MiB
 
 
-def setup_logger(log_name='dgg.log', write_to_console=True, level=logging.NOTSET):
+def setup_logger(level=logging.NOTSET, file_name='dgg.log', log_to_console=True):
     if not os.path.exists('logs'):
         os.mkdir('logs')
     handler = RotatingFileHandler(
-        f"logs/{log_name}", maxBytes=MAX_FILE_SIZE,
+        f"logs/{file_name}", maxBytes=MAX_FILE_SIZE,
         backupCount=10, encoding='utf8'
     )
     handlers = [handler]
-    if write_to_console:
+    if log_to_console:
         handlers.append(logging.StreamHandler())
     logging.basicConfig(
         handlers=handlers,

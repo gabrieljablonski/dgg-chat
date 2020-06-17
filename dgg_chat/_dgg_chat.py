@@ -15,10 +15,10 @@ from .exceptions import (
     InvalidHandlerError,
     InvalidMessageError,
 )
-from .messages import Message, MessageTypes, ChatUser
-from .handler import DGGChatHandler
+from .messages import Message, EventTypes, ChatUser
 from .api import DGGAPI, User
 from ._utils import format_payload
+from ._handler import DGGChatHandler
 
 
 class DGGChat:
@@ -37,8 +37,7 @@ class DGGChat:
     BASE_WS_THROTTLE_FACTOR = 1.1
 
     def __init__(
-        self, handler: DGGChatHandler = None,
-        auth_token=None, session_id=None,
+        self, auth_token=None, session_id=None,
         validate_auth_token=True,
         handle_history=False,
         handle_unread_whispers=False,
@@ -48,11 +47,6 @@ class DGGChat:
         """
         Parameters
         ----------
-        `handler` : `DGGHandler`
-
-            an instance of `DGGHandler` class (or a subclass).
-            defines what to do when stuff happens in chat.
-
         `auth_token` : `str`
 
             an authentication token for a dgg account.
@@ -68,22 +62,22 @@ class DGGChat:
             whether the token should be validated. `True` by default.
             (should only be needed to disable it if something's changed in how tokens are generated)
 
-        `handle_history` : `bool`
-
-            whether the previous 150 most recent messages from before connection should be handled.
-            `False` by default.
-
         `handle_unread_whispers` : `bool`
 
             whether unread whispers should be handled. requires `session_id` to work.
-            handlers are called before connecting.
+            handlers are called upon connecting (if `handle_history` also enabled, this happens before).
+            `False` by default.
+
+        `handle_history` : `bool`
+
+            whether the previous 150 most recent messages from before connection should be handled.
+            handlers are called upon connecting (if `handle_unread_whispers` also enabled, this happens after).
             `False` by default.
 
         `mark_as_read` : `bool`
 
             whether after handling a whisper it should be marked as read in the chat backend.
-            doing so will stop it from showing up when calling `get_unread_whispers()`.
-            if disabled, `get_unread_whispers()` can be called manually.
+            doing so will make it so it doesn't show up when calling `get_unread_whispers()`.
             requires `session_id` to work.
             `False` by default.
 
@@ -96,11 +90,16 @@ class DGGChat:
         if auth_token and validate_auth_token and not self.auth_token_is_valid(auth_token):
             raise InvalidAuthTokenError(auth_token)
 
+        self.mark_as_read = mark_as_read
+        self.handle_history = handle_history
+        self.handle_unread_whispers = handle_unread_whispers
+
         self._auth_token = auth_token
         self._session_id = session_id
 
-        self.mark_as_read = mark_as_read
         self._running = False
+        self._users_available_to_whisper = set()
+
         self._last_message_time = 0
         self._next_message_time = time.time()
         self._ws_throttle_factor = self.BASE_WS_THROTTLE_FACTOR
@@ -109,79 +108,12 @@ class DGGChat:
         self._queued_messages = Queue()
         self._unhandled_messages = Queue()
 
-        self._available_users_to_whisper = set()
-
         self._handler = DGGChatHandler(self)
-
-        if handler:
-            if not isinstance(handler, DGGChatHandler):
-                raise InvalidHandlerError(
-                    f"{type(handler).__name__} is not a subclass of {DGGChatHandler.__name__}"
-                )
-
-            handler.chat = self
-            handler.backup_handler = self._handler
-            self._handler = handler
-
         self._api = DGGAPI(auth_token, session_id)
 
         self._profile = self._update_profile() if auth_token else None
 
-        if handle_unread_whispers:
-            self._handle_unread_whispers()
-
-        if handle_history:
-            self._handle_history()
-
-        def _on_message(ws, message):
-            """The top level message handling function."""
-
-            parsed = Message.parse(message)
-
-            logging.debug(f"received message: `{message}`")
-            logging.info(f"parsed message: `{parsed}`")
-
-            if not self._unhandled_messages.empty() and parsed.type in (MessageTypes.ERROR, MessageTypes.WHISPER_SENT):
-                self._handle_message(parsed)
-
-            if parsed.type == MessageTypes.WHISPER:
-                self._available_users_to_whisper.add(parsed.user.nick)
-                msg = f"{parsed.user.nick} added to users available to whisper"
-                logging.info(msg)
-
-            if self._profile and parsed.type == MessageTypes.CHAT_MESSAGE and self._profile.nick in parsed.content:
-                self._handler.handle_special(MessageTypes.Special.ON_MENTION, parsed)
-
-            self._handler.handle_message(parsed)
-            if parsed.type == MessageTypes.WHISPER and self.mark_as_read:
-                self.mark_all_as_read(parsed.user.nick)
-
-        #  `on_error_message` is business related, i.e. `ERR` messages
-        def on_error(ws, error):
-            """Handler for websocket related errors."""
-
-            self._handler.handle_special(MessageTypes.Special.ON_WS_ERROR, error)
-
-            msg = f"websocket error: `{error}`"
-
-            logging.error(msg)
-            raise WebSocketException(msg)
-
-        def on_close(ws):
-            """Handler for when the websocket connection is closed."""
-
-            self._handler.handle_special(MessageTypes.Special.ON_WS_CLOSE)
-            self._running = False
-
-            logging.info('connection closed')
-
-        self._ws = WebSocketApp(
-            self.DGG_WS,
-            on_message=_on_message,
-            on_error=on_error,
-            on_close=on_close,
-            cookie=f"authtoken={self._auth_token}" if self._auth_token else None
-        )
+        self._setup_web_socket()
 
     def __enter__(self):
         self.connect()
@@ -210,6 +142,65 @@ class DGGChat:
     def message_is_valid(msg):
         return 0 < len(msg) <= 512
 
+    def _setup_web_socket(self):
+        def on_message(ws, message):
+            """The top-level message handling function."""
+
+            parsed = Message.parse(message)
+
+            logging.debug(f"received message: `{message}`")
+            logging.info(f"parsed message: `{parsed}`")
+
+            if not self._unhandled_messages.empty() and parsed.event in (EventTypes.ERROR, EventTypes.WHISPER_SENT):
+                self._handle_message(parsed)
+
+            if parsed.event == EventTypes.WHISPER:
+                enabled = str(getenv('DGG_ENABLE_WHISPERS')).lower()
+                if enabled and enabled != 'false':
+                    self._users_available_to_whisper.add(parsed.user.nick)
+                    logging.info(
+                        f"{parsed.user.nick} added to users available to whisper"
+                    )
+
+            self._handler.handle_event(EventTypes.Special.ANY_MESSAGE, parsed)
+
+            if self._profile and parsed.event == EventTypes.CHAT_MESSAGE and self._profile.nick in parsed.content:
+                self._handler.handle_event(EventTypes.Special.MENTION, parsed)
+
+            if parsed.event == EventTypes.WHISPER and self.mark_as_read:
+                self.mark_all_as_read(parsed.user.nick)
+
+            if parsed.event == EventTypes.WHISPER_SENT:
+                # `on_whisper_sent` handler takes no arguments
+                return self._handler.handle_event(parsed.event)
+            self._handler.handle_event(parsed.event, parsed)
+
+        def on_ws_error(ws, error):
+            """Handler for websocket related errors."""
+
+            self._handler.handle_event(EventTypes.Special.WS_ERROR, error)
+
+            msg = f"websocket error: `{error}`"
+
+            logging.error(msg)
+            raise WebSocketException(msg)
+
+        def on_close(ws):
+            """Handler for when the websocket connection is closed."""
+
+            self._handler.handle_event(EventTypes.Special.WS_CLOSE)
+            self._running = False
+
+            logging.info('connection closed')
+
+        self._ws = WebSocketApp(
+            self.DGG_WS,
+            on_message=on_message,
+            on_error=on_ws_error,
+            on_close=on_close,
+            cookie=f"authtoken={self._auth_token}" if self._auth_token else None
+        )
+
     def _update_profile(self):
         self._profile = self._api.user_info()
         logging.info(f"profile updated: {self._profile}")
@@ -221,7 +212,7 @@ class DGGChat:
 
         history = self._api.chat_history()
         for message in history:
-            self._handler.handle_message(Message.parse(message))
+            self._handler.handle_event(message.event, Message.parse(message))
 
     def _handle_unread_whispers(self):
         """Handles unread whispers. Marks them as read."""
@@ -234,7 +225,7 @@ class DGGChat:
         unread = self.get_unread_whispers()
         for user, whispers in unread.items():
             for whisper in whispers:
-                self._handler.handle_message(whisper.as_websocket_message)
+                self._handler.handle_event(whisper.event, whisper.as_websocket_message)
 
     def _handle_message(self, message):
         try:
@@ -248,7 +239,7 @@ class DGGChat:
             logging.info('resetting throttle factor')
             self._ws_throttle_factor = self.BASE_WS_THROTTLE_FACTOR
 
-        if message.type == MessageTypes.ERROR:
+        if message.event == EventTypes.ERROR:
             # max throttle factor seems to be 16 (16*.3=5s)
             # verified empirically since this doesn't seem to match the source code (https://github.com/destinygg/chat/blob/master/connection.go#L407)
             if message.payload == 'throttled':
@@ -286,7 +277,7 @@ class DGGChat:
 
             if self._anti_throttle_bot:
                 anti_throttle_payload = format_payload(
-                    MessageTypes.WHISPER, nick=self._anti_throttle_bot, data='0'
+                    EventTypes.WHISPER, nick=self._anti_throttle_bot, data='0'
                 )
                 logging.debug(f"anti-throttle payload: `{anti_throttle_payload}`")
 
@@ -344,6 +335,12 @@ class DGGChat:
         if self._running:
             raise ConnectionError('chat is already connected')
 
+        if self.handle_unread_whispers:
+            self._handle_unread_whispers()
+
+        if self.handle_history:
+            self._handle_history()
+
         logging.info('setting up connection')
         t = Thread(target=self.run_forever, daemon=True)
         t.start()
@@ -375,21 +372,6 @@ class DGGChat:
         while self._ws.run_forever():
             pass
 
-    def send_chat_message(self, message):
-        if not self.message_is_valid(message):
-            raise InvalidMessageError
-
-        if not self._auth_token and not self._session_id:
-            raise AnonymousConnectionError('unable to send chat messages')
-
-        enabled = str(getenv('DGG_ENABLE_CHAT_MESSAGES')).lower()
-        if not enabled or enabled in ('none', 'false'):
-            msg = 'sending chat messages is currently disabled'
-            raise DumbFucksBeware(msg)
-
-        logging.info('queue send chat message')
-        self._queue_message(MessageTypes.CHAT_MESSAGE, data=message)
-
     def send_whisper(self, user, message):
         if not self.message_is_valid(message):
             raise InvalidMessageError
@@ -400,10 +382,104 @@ class DGGChat:
         if self._profile and self._profile.nick == user:
             raise ValueError("you can't whisper yourself, you silly goose")
 
-        enabled = str(getenv('DGG_ENABLE_WHISPER_FIRST')).lower()
-        if (not enabled or enabled in ('none', 'false')) and user not in self._available_users_to_whisper:
-            msg = 'whispers can only be sent to users who whispered you in this session'
-            raise DumbFucksBeware(msg)
+        enabled = str(getenv('DGG_ENABLE_WHISPERS')).lower()
+        if not enabled or enabled in ('none', 'false') or user not in self._users_available_to_whisper:
+            raise DumbFucksBeware('cannot send whispers')
 
         logging.info('queue send whisper')
-        self._queue_message(MessageTypes.WHISPER, nick=user, data=message)
+        self._queue_message(EventTypes.WHISPER, nick=user, data=message)
+
+    def on(self, f, event):
+        return self._handler.on(f, event)
+
+    def on_any_message(self, f):
+        """
+        Called when receiving any message. 
+        Specific handler still called as usual.
+        """
+
+        return self.on(f, EventTypes.Special.ANY_MESSAGE)
+
+    def on_served_connections(self, f):
+        """
+        Called when receiving the first message when a new connection is established,
+        which lists all users connected and amount of connections currently served.
+        """
+
+        return self.on(f, EventTypes.SERVED_CONNECTIONS)
+
+    def on_user_joined(self, f):
+        return self.on(f, EventTypes.USER_JOINED)
+
+    def on_user_quit(self, f):
+        return self.on(f, EventTypes.USER_QUIT)
+
+    def on_broadcast(self, f):
+        """
+        Called when receiving broadcasts (the yellow messages),
+        such as when a user subscribes.
+        """
+
+        return self.on(f, EventTypes.BROADCAST)
+
+    def on_chat_message(self, f):
+        return self.on(f, EventTypes.CHAT_MESSAGE)
+
+    def on_mention(self, f):
+        """
+        Called when a chat message contains the current user's name.
+        It's not called by the handler, but by the `DGGChat` instance,
+        so it doesn't need to be mapped. `on_chat_message()` is still called.
+        """
+
+        return self.on(f, EventTypes.Special.MENTION)
+
+    def on_whisper(self, f):
+        return self.on(f, EventTypes.WHISPER)
+
+    def on_whisper_sent(self, f):
+        """Called on confirmation messages that a whisper was successfully sent."""
+
+        return self.on(f, EventTypes.WHISPER_SENT)
+
+    def on_mute(self, f):
+        return self.on(f, EventTypes.MUTE)
+
+    def on_unmute(self, f):
+        return self.on(f, EventTypes.UNMUTE)
+
+    def on_ban(self, f):
+        return self.on(f, EventTypes.BAN)
+
+    def on_unban(self, f):
+        return self.on(f, EventTypes.UNBAN)
+
+    def on_sub_only(self, f):
+        return self.on(f, EventTypes.SUB_ONLY)
+
+    def on_error(self, f):
+        """
+        Called on an error message when something goes wrong, 
+        such as when sending a whisper to a user that doesn't exist.
+        """
+
+        return self.on(f, EventTypes.ERROR)
+
+    def on_ws_error(self, f):
+        """
+        Called when something goes wrong with the websocket connection.
+        It's not called by the handler, but by the `DGGChat` instance,
+        so it doesn't need to be mapped.
+        """
+        
+        return self.on(f, EventTypes.Special.WS_ERROR)
+
+    def on_ws_close(self, f):
+        """
+        Called when the websocket connection is closed.
+        It's not called by the handler, but by the `DGGChat` instance,
+        so it doesn't need to be mapped.
+        """
+        
+        return self.on(f, EventTypes.Special.WS_CLOSE)
+        

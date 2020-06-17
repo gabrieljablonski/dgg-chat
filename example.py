@@ -3,93 +3,68 @@ from dotenv import load_dotenv
 
 from dgg_chat import DGGChat
 from dgg_chat.messages import (
-    MessageTypes,
+    EventTypes,
     Message,
     ServedConnections,
-    ChatMessage,
-    Whisper,
 )
-from dgg_chat.handler import DGGChatHandler
 from dgg_chat.logging import setup_logger, WARNING, INFO, DEBUG
 
 
-class CustomHandler(DGGChatHandler):
-    def on_chat_message(self, message: ChatMessage):
-        print(f"{message.user.nick} just said: {message.content}")
+# uses the `logging` module
+# alternatively it can be setup manually
+setup_logger(INFO)
 
-    def on_whisper(self, whisper: Whisper):
-        print(
-            f"Just received a message from {whisper.user.nick}: {whisper.content}"
-        )
-        self.chat.send_whisper(whisper.user.nick, 'Hello!')
-
-    def on_whisper_sent(self):
-        print('whisper ok')
-
-    def on_ws_error(self, error):
-        print(f"something went wrong: {error}")
-
-    def on_ws_close(self):
-        print('connection closed')
-
-
-class CustomHandlerWithCustomNames(DGGChatHandler):
-    def mapping(self):
-        return {
-            MessageTypes.SERVED_CONNECTIONS: self.on_served_connections,
-            MessageTypes.CHAT_MESSAGE: self.on_chat,
-            MessageTypes.WHISPER: self.on_private,
-            MessageTypes.WHISPER_SENT: self.on_private_sent,
-            MessageTypes.Special.ON_ANY_MESSAGE: self.on_all_messages,
-        }
-
-    def on_all_messages(self, message: Message):
-        print(f"from `on_all_messages()`: {message}")
-
-    def on_served_connections(self, connections: ServedConnections):
-        print(
-            f"There are {connections.count} connections and {len(connections.users)} users online."
-        )
-
-    def on_chat(self, message: ChatMessage):
-        print(f"{message.user.nick} just said: {message.content}")
-
-    def on_private(self, whisper: Whisper):
-        print(
-            f"Just received a message from {whisper.user.nick}: {whisper.content}"
-        )
-        self.chat.send_whisper(whisper.user.nick, 'Hello!')
-
-    def on_private_sent(self):
-        print('whisper ok')
-
-    # does not need to be mapped!
-    def on_ws_error(self, error):
-        print(f"something went wrong: {error}")
-
-    # does not need to be mapped!
-    def on_ws_close(self):
-        print('connection closed')
-
-
-setup_logger(DEBUG)
-
+# python-dotenv is recommended for storing the auth token, although not required
 load_dotenv(verbose=True)
 dgg_auth_token = getenv('DGG_AUTH_TOKEN')
 
-handler = CustomHandler()
-# handler = CustomHandlerWithCustomNames()
-chat = DGGChat(
-    auth_token=dgg_auth_token,
-    # handler=handler,
-)
+chat = DGGChat(auth_token=dgg_auth_token)
+
+
+@chat.on_any_message
+def on_any_message(message: Message):
+    print(f"from `on_any_message()`: {message}")
+
+
+@chat.on_served_connections
+def on_served_connections(connections: ServedConnections):
+    print(
+        f"There are {connections.count} connections and {len(connections.users)} users online."
+    )
+
+
+@chat.on_whisper
+@chat.on_chat_message
+def on_chat_or_whisper(message: Message):
+    if message.event == EventTypes.CHAT_MESSAGE:
+        print(f"{message.user.nick} just said: {message.content}")
+    if message.event == EventTypes.WHISPER:
+        print(
+            f"Just received a message from {message.user.nick}: {message.content}"
+        )
+        chat.send_whisper(message.user.nick, 'Hello!')
+
+
+@chat.on_whisper_sent
+def on_whisper_sent():
+    print('whisper ok')
+
+
+@chat.on_error
+@chat.on_ws_error
+def on_ws_error(error):
+    print(f"something went wrong: `{error}`")
+
+
+@chat.on_ws_close
+def on_ws_close():
+    print('connection closed')
+
 
 # default way of running (blocking)
-
 chat.run_forever()
 
-# can also be run in parallel (non-blocking)
-
+## can also be run in parallel (non-blocking)
 # chat.connect()
 # do_stuff()
 # ...

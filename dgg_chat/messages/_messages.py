@@ -1,30 +1,6 @@
 from json import loads, dumps
 
-
-class MessageTypes:
-    SERVED_CONNECTIONS = 'NAMES'
-    USER_JOINED = 'JOIN'
-    USER_QUIT = 'QUIT'
-    BROADCAST = 'BROADCAST'
-    CHAT_MESSAGE = 'MSG'
-    WHISPER = 'PRIVMSG'
-    WHISPER_SENT = 'PRIVMSGSENT'
-    MUTE = 'MUTE'
-    UNMUTE = 'UNMUTE'
-    BAN = 'BAN'
-    UNBAN = 'UNBAN'
-    SUB_ONLY = 'SUBONLY'
-    ERROR = 'ERR'
-
-    class Special:
-        ON_ANY_MESSAGE = 'ON_ANY_MESSAGE'
-        ON_MENTION = 'ON_MENTION'
-        ON_WS_ERROR = 'ON_WS_ERROR'
-        ON_WS_CLOSE = 'ON_WS_CLOSE'
-
-    @staticmethod
-    def is_moderation_message(msg_type):
-        return msg_type in (MessageTypes.MUTE, MessageTypes.UNMUTE, MessageTypes.BAN, MessageTypes.UNBAN)
+from .._event_types import EventTypes
 
 
 class ChatUser:
@@ -43,7 +19,7 @@ class ChatUser:
 class Message:
     def __init__(self, msg):
         split = msg.split()
-        self.type = split[0]
+        self.event = split[0]
         payload = ' '.join(split[1:])
         try:
             self.payload = loads(payload)
@@ -58,20 +34,20 @@ class Message:
 
     @classmethod
     def parse(cls, msg):
-        message_type = msg.split()[0]
-        if message_type == MessageTypes.SERVED_CONNECTIONS:
+        event = msg.split()[0]
+        if event == EventTypes.SERVED_CONNECTIONS:
             return ServedConnections(msg)
-        if message_type == MessageTypes.USER_JOINED:
+        if event == EventTypes.USER_JOINED:
             return UserJoined(msg)
-        if message_type == MessageTypes.USER_QUIT:
+        if event == EventTypes.USER_QUIT:
             return UserQuit(msg)
-        if message_type == MessageTypes.BROADCAST:
+        if event == EventTypes.BROADCAST:
             return Broadcast(msg)
-        if message_type == MessageTypes.CHAT_MESSAGE:
+        if event == EventTypes.CHAT_MESSAGE:
             return ChatMessage(msg)
-        if message_type == MessageTypes.WHISPER:
+        if event == EventTypes.WHISPER:
             return Whisper(msg)
-        if MessageTypes.is_moderation_message(message_type):
+        if EventTypes.is_moderation_event(event):
             return ModerationMessage(msg)
         return cls(msg)
 
