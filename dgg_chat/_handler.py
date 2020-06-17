@@ -1,7 +1,7 @@
 import logging
 
 
-class DGGChatHandler:
+class DGGChatEventHandler:
     def __init__(self):
         self._handlers = {}
 

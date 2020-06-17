@@ -12,13 +12,12 @@ from .exceptions import (
     AnonymousSessionError,
     DumbFucksBeware,
     InvalidAuthTokenError,
-    InvalidHandlerError,
     InvalidMessageError,
 )
 from .messages import Message, EventTypes, ChatUser
 from .api import DGGAPI, User
 from ._utils import format_payload
-from ._handler import DGGChatHandler
+from ._handler import DGGChatEventHandler
 
 
 class DGGChat:
@@ -108,10 +107,10 @@ class DGGChat:
         self._queued_messages = Queue()
         self._unhandled_messages = Queue()
 
-        self._handler = DGGChatHandler()
+        self._handler = DGGChatEventHandler()
         self._api = DGGAPI(auth_token, session_id)
 
-        self._profile = self._update_profile() if auth_token else None
+        self._profile = self._reload_profile() if auth_token else None
 
         self._setup_web_socket()
 
@@ -201,7 +200,7 @@ class DGGChat:
             cookie=f"authtoken={self._auth_token}" if self._auth_token else None
         )
 
-    def _update_profile(self):
+    def _reload_profile(self):
         self._profile = self._api.user_info()
         logging.info(f"profile updated: {self._profile}")
 
@@ -304,10 +303,10 @@ class DGGChat:
         if not self._auth_token and not self._session_id:
             raise AnonymousConnectionError('unable to update profile')
 
-        self._update_profile()
+        self._reload_profile()
 
     def mark_all_as_read(self, from_user=None):
-        # TODO: implement more efficiently (user `/messages/inbox|read` endpoints)
+        # TODO: implement more efficiently (use `/messages/inbox|read` endpoints)
         self.get_unread_whispers(from_user=from_user)
 
     def get_unread_whispers(self, from_user=None, received_only=True):
@@ -343,12 +342,6 @@ class DGGChat:
         if self._running:
             raise ConnectionError('chat is already connected')
 
-        if self.handle_unread_whispers:
-            self._handle_unread_whispers()
-
-        if self.handle_history:
-            self._handle_history()
-
         logging.info('setting up connection')
         t = Thread(target=self.run_forever, daemon=True)
         t.start()
@@ -368,11 +361,18 @@ class DGGChat:
         self._running = False
 
     def run_forever(self):
-        """Connect to chat and blocks the thread."""
+        """Connect to chat and block the thread."""
 
         if self._running:
-            msg = 'chat already connected, call `disconnect()` first'
-            raise ConnectionError(msg)
+            raise ConnectionError(
+                'chat already connected, call `disconnect()` first'
+            )
+        
+        if self.handle_unread_whispers:
+            self._handle_unread_whispers()
+
+        if self.handle_history:
+            self._handle_history()
 
         logging.info('running websocket on loop')
         self._start_send_loop()
@@ -382,7 +382,7 @@ class DGGChat:
 
     def send_whisper(self, user, message):
         if not self.message_is_valid(message):
-            raise InvalidMessageError
+            raise InvalidMessageError(message)
 
         if not self._auth_token and not self._session_id:
             raise AnonymousConnectionError('unable to send whispers')

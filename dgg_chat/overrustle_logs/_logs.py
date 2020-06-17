@@ -12,7 +12,7 @@ from .._utils import validate_date_time, isplit
 class DGGLogs:
     """
     API for OverRustleLogs dgg logs.
-    All methods return generators, thus memory efficient.
+    API calls return generators, thus memory efficient.
     Messages are timestamped in UTC.
     """
 
@@ -60,8 +60,8 @@ class DGGLogs:
     @classmethod
     def get_daily_logs(cls, year=0, month=0, day=0):
         """
-        Retrieves chat logs for a specific day.
-        If any is provided, use current based on UTC time.
+        Retrieves chat logs for a specific day, month, and year.
+        If any isn't provided, use current based on UTC time.
         """
 
         now = datetime.utcnow()
@@ -83,7 +83,7 @@ class DGGLogs:
 
         `month` : `int` or `str`
 
-            if `str`, has to be the full month name ('January', 'February', ...)
+            if `str`, has to be the full month name ('January', 'February', ...).
 
         """
 
@@ -98,7 +98,7 @@ class DGGLogs:
 
         `month` : `int` or `str`
 
-            if `str`, has to be the full month name ('January', 'February', ...)
+            if `str`, has to be the full month name ('January', 'February', ...).
 
         """
 
@@ -113,7 +113,7 @@ class DGGLogs:
 
         `month` : `int` or `str`
 
-            if `str`, has to be the full month name ('January', 'February', ...)
+            if `str`, has to be the full month name ('January', 'February', ...).
 
         """
 
@@ -128,7 +128,7 @@ class DGGLogs:
 
         `month` : `int` or `str`
 
-            if `str`, has to be the full month name ('January', 'February', ...)
+            if `str`, has to be the full month name ('January', 'February', ...).
 
         """
 

@@ -6,6 +6,5 @@ from ._exceptions import (
     CDNError,
     InvalidAuthTokenError,
     InvalidChatLine,
-    InvalidHandlerError,
     InvalidMessageError,
 )

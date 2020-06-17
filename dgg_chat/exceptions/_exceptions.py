@@ -55,10 +55,6 @@ class InvalidChatLine(Exception):
         super().__init__(line)
 
 
-class InvalidHandlerError(Exception):
-    pass
-
-
 class InvalidMessageError(Exception):
     def __init__(self, message=''):
         message = message or 'message length should be in inclusive range [1, 512]'

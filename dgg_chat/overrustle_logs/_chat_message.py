@@ -21,7 +21,6 @@ class ChatMessage:
     def from_chat_line(cls, line):
         match = findall(cls.CHAT_LINE_PATTERN, line.strip())
         if not match:
-            print(line)
             raise InvalidChatLine(line)
 
         date_time, user, content = match[0]
