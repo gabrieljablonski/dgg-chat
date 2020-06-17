@@ -23,7 +23,7 @@ class DGGLogs:
         for line in isplit(logs, '\n'):
             if line:
                 yield ChatMessage.from_chat_line(line)
-    
+
     @classmethod
     def _build_date(cls, year=0, month=None):
         if not month:
@@ -37,7 +37,7 @@ class DGGLogs:
         # raises `ValueError`
         validate_date_time(year=year, month=month)
         return f"{month_full} {year}"
-    
+
     @classmethod
     def _get(cls, endpoint, year=0, month=None):
         date = cls._build_date(year, month)
@@ -56,7 +56,7 @@ class DGGLogs:
             raise APIError(url, r)
 
         return cls._parse_logs(r.content.decode('utf8'))
-    
+
     @classmethod
     def get_daily_logs(cls, year=0, month=0, day=0):
         """
@@ -74,7 +74,7 @@ class DGGLogs:
 
         endpoint = f"{date}.txt"
         return cls._get(endpoint, year, month)
-    
+
     @classmethod
     def get_user_logs(cls, user, year=0, month: Union[int, str] = None):
         """
@@ -89,7 +89,7 @@ class DGGLogs:
 
         endpoint = f"userlogs/{user}.txt"
         return cls._get(year, month, endpoint)
-    
+
     @classmethod
     def get_broadcaster_logs(cls, year=0, month: Union[int, str] = None):
         """
@@ -104,7 +104,7 @@ class DGGLogs:
 
         endpoint = f"broadcaster.txt"
         return cls._get(endpoint, year, month)
-    
+
     @classmethod
     def get_subscribers(cls, year=0, month: Union[int, str] = None):
         """
@@ -119,7 +119,7 @@ class DGGLogs:
 
         endpoint = f"subscribers.txt"
         return cls._get(endpoint, year, month)
-    
+
     @classmethod
     def get_bans(cls, year=0, month: Union[int, str] = None):
         """

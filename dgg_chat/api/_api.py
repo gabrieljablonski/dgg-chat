@@ -103,7 +103,7 @@ class DGGAPI:
                 break
             count -= len(inbox)
             offset += len(inbox)
-            
+
         return messages
 
     def info_stream(self):

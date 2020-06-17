@@ -64,7 +64,7 @@ def on_ws_close():
 # default way of running (blocking)
 chat.run_forever()
 
-## can also be run in parallel (non-blocking)
+# can also be run in parallel (non-blocking)
 # chat.connect()
 # do_stuff()
 # ...

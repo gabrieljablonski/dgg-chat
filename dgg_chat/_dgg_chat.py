@@ -225,7 +225,9 @@ class DGGChat:
         unread = self.get_unread_whispers()
         for user, whispers in unread.items():
             for whisper in whispers:
-                self._handler.handle_event(whisper.event, whisper.as_websocket_message)
+                self._handler.handle_event(
+                    whisper.event, whisper.as_websocket_message
+                )
 
     def _handle_message(self, message):
         try:
@@ -248,7 +250,9 @@ class DGGChat:
 
             if message.payload == 'duplicate':
                 logging.warning('duplicate message')
-                self._ws_throttle_factor = min(16, 1 + self._ws_throttle_factor)
+                self._ws_throttle_factor = min(
+                    16, 1 + self._ws_throttle_factor
+                )
         else:
             self._last_message_time = now
 
@@ -279,7 +283,9 @@ class DGGChat:
                 anti_throttle_payload = format_payload(
                     EventTypes.WHISPER, nick=self._anti_throttle_bot, data='0'
                 )
-                logging.debug(f"anti-throttle payload: `{anti_throttle_payload}`")
+                logging.debug(
+                    f"anti-throttle payload: `{anti_throttle_payload}`"
+                )
 
                 self._ws.send(anti_throttle_payload)
                 self._unhandled_messages.put(anti_throttle_payload)
@@ -319,7 +325,9 @@ class DGGChat:
 
         if from_user:
             if from_user in unread:
-                messages[from_user] = self._api.messages_inbox(from_user, unread[from_user])
+                messages[from_user] = self._api.messages_inbox(
+                    from_user, unread[from_user]
+                )
             else:
                 messages[from_user] = []
             return messages
@@ -471,7 +479,7 @@ class DGGChat:
         It's not called by the handler, but by the `DGGChat` instance,
         so it doesn't need to be mapped.
         """
-        
+
         return self.on(f, EventTypes.Special.WS_ERROR)
 
     def on_ws_close(self, f):
@@ -480,6 +488,5 @@ class DGGChat:
         It's not called by the handler, but by the `DGGChat` instance,
         so it doesn't need to be mapped.
         """
-        
+
         return self.on(f, EventTypes.Special.WS_CLOSE)
-        
