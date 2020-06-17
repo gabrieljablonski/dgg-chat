@@ -5,7 +5,7 @@ replying to whispers, accessing the dgg API, and retrieving user logs and CDN as
 
 ## How It Works
 
-The package is based on messages emitted from dgg's websocket interface.
+The package makes use of messages sent via the dgg websocket interface.
 It's based around the `DGGChat` class, which runs the main event loop, 
 invoking the handlers implemented, as well as allowing you to reply to whispers.
 
@@ -14,12 +14,12 @@ When a message is received from the websocket, it is redirected to its respectiv
 
 ## How To Use
 
-To register an event handler, you must use one of the decorators listed in the 
-[Event Types and Their Respective Handlers](#event-types-and-their-respective-handlers)
 A handler is a method that receives one argument (with two exceptions), which will 
 be of type `dgg_chat.messages.Message` or one of its subclasses. The two exceptions 
 are the handlers for the `WHISPER_SENT` and the `ON_WS_CLOSE` events, which have no arguments. 
 Each handler receives a specific type of message, defined in the [`messages`](./dgg_chat/messages/_messages.py) module.
+To register an event handler, you must use one of the decorators listed in the 
+[Event Types and Their Respective Handlers](#event-types-and-their-respective-handlers) section.
 
 A simple example can be found under the [`DGGChat`](#dggchat) section. More details can be found in the [`example.py`](./example.py) file.
 
@@ -80,30 +80,29 @@ Here's a quick example on how to setup and run the chat instance.
 More details can be found in the [`example.py`](./example.py) file.
 
 ```python
-    from dgg_chat import DGGChat
+from dgg_chat import DGGChat
 
-    dgg_auth_token = "<your dgg auth token>"
+dgg_auth_token = "<your dgg auth token>"
 
-    chat = DGGChat(auth_token=dgg_auth_token)
-    
-    def CustomHandler(DGGChatHandler):
-        @chat.on_user_joined
-        def on_user_joined(self, joined):
-            print(f"{joined.user} just joined!")
+chat = DGGChat(auth_token=dgg_auth_token)
 
-        @chat.on_chat_message
-        def on_chat_message(self, message):
-            print(f"{message.user} just said something: {message.content}")
+@chat.on_user_joined
+def on_user_joined(joined):
+    print(f"{joined.user} just joined!")
 
-        @chat.on_whisper
-        def on_whisper(self, whisper):
-            print(f"{whisper.user} just sent you a whisper: {whisper.content}")
-            self.chat.send_whisper(whisper.user, "Hello!")
+@chat.on_chat_message
+def on_chat_message(message):
+    print(f"{message.user} just said something: {message.content}")
 
-        ...
+@chat.on_whisper
+def on_whisper(whisper):
+    print(f"{whisper.user} just sent you a whisper: {whisper.content}")
+    chat.send_whisper(whisper.user, "Hello!")
 
-    # blocking call
-    chat.run_forever()
+...
+
+# blocking call
+chat.run_forever()
 ```
 
 ## Authentication
@@ -142,11 +141,8 @@ With the session key setup, you should be able to retrieve messages directly fro
 Be mindful the session id expires after [5 hours(?) without use](https://github.com/destinygg/website/blob/master/public/index.php#L18), 
 so if stuff stops working, check if this might be it.
 
-Hopefully soon the session id method will be unnecessary and the `auth_token` will be enough
-to do everything, but the API has been giving me some trouble.
-
 ## Extra Features
 
-- Use `DGGChat().api` (or `from dgg_chat.api import DGGAPI`) to access the dgg API.
+- Use `DGGChat().api` (or directly with `from dgg_chat.api import DGGAPI`) to access other functionalities of the dgg API.
 - Use `DGGCDN()` (`from dgg_chat.cdn import DGGCDN`) to retrieve info about stuff like flairs and emotes from the CDN.
 - Use `DGGLogs` (`from dgg_chat.overrustle_logs import DGGLogs`) to retrieve chat logs.
