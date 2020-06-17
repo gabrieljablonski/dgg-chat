@@ -108,7 +108,7 @@ class DGGChat:
         self._queued_messages = Queue()
         self._unhandled_messages = Queue()
 
-        self._handler = DGGChatHandler(self)
+        self._handler = DGGChatHandler()
         self._api = DGGAPI(auth_token, session_id)
 
         self._profile = self._update_profile() if auth_token else None

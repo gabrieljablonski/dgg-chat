@@ -2,13 +2,8 @@ import logging
 
 
 class DGGChatHandler:
-    def __init__(self, chat=None):
-        self._chat = chat
+    def __init__(self):
         self._handlers = {}
-
-    @property
-    def chat(self):
-        return self._chat
 
     def on(self, f, event):
         self._handlers.setdefault(event, set()).add(f)
