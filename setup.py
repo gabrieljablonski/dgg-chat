@@ -1,13 +1,14 @@
 from setuptools import setup, find_packages
 from pathlib import Path
 
+from dgg_chat import __version__
 
 long_description = Path('README.md').read_text()
 
 setup(
     name='dgg-chat',
     packages=find_packages(),
-    version='0.1.2-alpha',
+    version=__version__,
     license='MIT',
     description='A package that lets you do stuff in dgg chat',
     long_description=long_description,
