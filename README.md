@@ -160,7 +160,7 @@ Scroll down to the `Cookies` header. The key after `sid=` is your session id.
 ![session id](https://i.imgur.com/v42efey.png)
 
 With the session key setup, you should be able to retrieve messages directly from your inbox.
-Be mindful the session id expires after [5 hours(?) without use](https://github.com/destinygg/website/blob/master/public/index.php#L18), 
+Be mindful the session id expires after [5 hours without use (?)](https://github.com/destinygg/website/blob/master/public/index.php#L18), 
 so if stuff stops working, check if this might be it.
 
 ## Extra Features
