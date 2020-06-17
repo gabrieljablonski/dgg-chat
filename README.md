@@ -32,7 +32,7 @@ It's based around the `DGGChat` class, which runs the main event loop,
 invoking the handlers implemented, as well as allowing you to reply to whispers.
 
 When a message is received from the websocket, it is redirected to its respective handler 
-(and any other relevant [special handler](#special-handlers)).
+(and any other relevant [special handler](#special-events)).
 
 ## How To Use
 
