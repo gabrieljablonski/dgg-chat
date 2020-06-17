@@ -83,8 +83,8 @@ class DGGChat:
 
         `anti_throttle_bot` : `str`
 
-            the chat nick for a echo bot connected in chat.
-            used to bypass throttling limits.
+            the chat nick for an echo bot connected in chat.
+            Only use it if you know what you're doing.
         """
 
         if auth_token and validate_auth_token and not self.auth_token_is_valid(auth_token):
