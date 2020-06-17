@@ -7,7 +7,7 @@ long_description = Path('README.md').read_text()
 setup(
     name='dgg-chat',
     packages=find_packages(),
-    version='0.1.1-alpha',
+    version='0.1.2-alpha',
     license='MIT',
     description='A package that lets you do stuff in dgg chat',
     long_description=long_description,
