@@ -3,6 +3,14 @@
 A package that lets you do stuff in [dgg](https://destiny.gg) chat, like parsing messages in chat,
 replying to whispers, accessing the dgg API, and retrieving user logs and CDN assets.
 
+## How To Install
+
+This package is available through pip!
+
+```sh
+pip install dgg-chat
+```
+
 ## How It Works
 
 The package makes use of messages sent via the dgg websocket interface.

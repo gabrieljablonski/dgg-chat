@@ -4,3 +4,8 @@ venv/
 chat/
 chat-bot/
 logs/
+dist/
+build/
+*.egg-info/
+
+MANIFEST
