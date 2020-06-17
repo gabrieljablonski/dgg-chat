@@ -26,6 +26,7 @@ class DGGChat:
     """
 
     DGG_WS = 'wss://destiny.gg/ws'
+    RECONNECT_DELAY = 3    # in seconds
     WAIT_WS_BOOTSTRAP = 1  # in seconds
     # considering server throttle is 300ms and some network overhead
     WS_THROTTLE_DELAY = .200  # in seconds
@@ -378,7 +379,10 @@ class DGGChat:
         self._start_send_loop()
 
         while self._ws.run_forever():
-            pass
+            logging.warning(
+                f"connection dropped. trying to reconnect in {self.RECONNECT_DELAY} seconds..."
+            )
+            time.sleep(self.RECONNECT_DELAY)
 
     def send_whisper(self, user, message):
         if not self.message_is_valid(message):
@@ -397,7 +401,7 @@ class DGGChat:
         logging.info('queue send whisper')
         self._queue_message(EventTypes.WHISPER, nick=user, data=message)
 
-    def on(self, f, event):
+    def _on(self, f, event):
         return self._handler.on(f, event)
 
     def on_any_message(self, f):
@@ -406,7 +410,7 @@ class DGGChat:
         Specific handler still called as usual.
         """
 
-        return self.on(f, EventTypes.Special.ANY_MESSAGE)
+        return self._on(f, EventTypes.Special.ANY_MESSAGE)
 
     def on_served_connections(self, f):
         """
@@ -414,13 +418,13 @@ class DGGChat:
         which lists all users connected and amount of connections currently served.
         """
 
-        return self.on(f, EventTypes.SERVED_CONNECTIONS)
+        return self._on(f, EventTypes.SERVED_CONNECTIONS)
 
     def on_user_joined(self, f):
-        return self.on(f, EventTypes.USER_JOINED)
+        return self._on(f, EventTypes.USER_JOINED)
 
     def on_user_quit(self, f):
-        return self.on(f, EventTypes.USER_QUIT)
+        return self._on(f, EventTypes.USER_QUIT)
 
     def on_broadcast(self, f):
         """
@@ -428,10 +432,10 @@ class DGGChat:
         such as when a user subscribes.
         """
 
-        return self.on(f, EventTypes.BROADCAST)
+        return self._on(f, EventTypes.BROADCAST)
 
     def on_chat_message(self, f):
-        return self.on(f, EventTypes.CHAT_MESSAGE)
+        return self._on(f, EventTypes.CHAT_MESSAGE)
 
     def on_mention(self, f):
         """
@@ -440,30 +444,30 @@ class DGGChat:
         so it doesn't need to be mapped. `on_chat_message()` is still called.
         """
 
-        return self.on(f, EventTypes.Special.MENTION)
+        return self._on(f, EventTypes.Special.MENTION)
 
     def on_whisper(self, f):
-        return self.on(f, EventTypes.WHISPER)
+        return self._on(f, EventTypes.WHISPER)
 
     def on_whisper_sent(self, f):
         """Called on confirmation messages that a whisper was successfully sent."""
 
-        return self.on(f, EventTypes.WHISPER_SENT)
+        return self._on(f, EventTypes.WHISPER_SENT)
 
     def on_mute(self, f):
-        return self.on(f, EventTypes.MUTE)
+        return self._on(f, EventTypes.MUTE)
 
     def on_unmute(self, f):
-        return self.on(f, EventTypes.UNMUTE)
+        return self._on(f, EventTypes.UNMUTE)
 
     def on_ban(self, f):
-        return self.on(f, EventTypes.BAN)
+        return self._on(f, EventTypes.BAN)
 
     def on_unban(self, f):
-        return self.on(f, EventTypes.UNBAN)
+        return self._on(f, EventTypes.UNBAN)
 
     def on_sub_only(self, f):
-        return self.on(f, EventTypes.SUB_ONLY)
+        return self._on(f, EventTypes.SUB_ONLY)
 
     def on_error(self, f):
         """
@@ -471,7 +475,7 @@ class DGGChat:
         such as when sending a whisper to a user that doesn't exist.
         """
 
-        return self.on(f, EventTypes.ERROR)
+        return self._on(f, EventTypes.ERROR)
 
     def on_ws_error(self, f):
         """
@@ -480,7 +484,7 @@ class DGGChat:
         so it doesn't need to be mapped.
         """
 
-        return self.on(f, EventTypes.Special.WS_ERROR)
+        return self._on(f, EventTypes.Special.WS_ERROR)
 
     def on_ws_close(self, f):
         """
@@ -489,4 +493,4 @@ class DGGChat:
         so it doesn't need to be mapped.
         """
 
-        return self.on(f, EventTypes.Special.WS_CLOSE)
+        return self._on(f, EventTypes.Special.WS_CLOSE)
