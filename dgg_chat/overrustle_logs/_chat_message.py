@@ -1,5 +1,4 @@
 from re import findall
-from json import dumps
 from datetime import datetime
 
 from ..exceptions import InvalidChatLine
@@ -19,7 +18,7 @@ class ChatMessage:
 
     @property
     def original(self):
-        return f"[format_date_time(self.date_time, with_ms=True)] {self.user}: self.content"
+        return f"[{format_datetime(self.date_time)}] {self.user}: {self.content}"
 
     @classmethod
     def from_chat_line(cls, line):
