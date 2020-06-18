@@ -56,8 +56,8 @@ class InvalidChatLine(Exception):
 
 
 class InvalidMessageError(Exception):
-    def __init__(self, message=''):
-        message = message or 'message length should be in inclusive range [1, 512]'
+    def __init__(self, message):
+        message = f"message length should be between 1 and 512 characters: `{message}`"
 
         logging.warning(message)
 

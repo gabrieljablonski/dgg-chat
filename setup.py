@@ -25,5 +25,9 @@ setup(
         'Programming Language :: Python :: 3.8',
     ],
     python_requires='>=3.8',
-    install_requires=['websocket_client', 'requests'],
+    install_requires=[
+        'websocket_client', 
+        'requests',
+        'numpy', 'wsaccel'  # improve websockets performance
+    ],
 )

@@ -42,6 +42,8 @@ are the handlers for the `WHISPER_SENT` and the `ON_WS_CLOSE` events, which have
 Each handler receives a specific type of message, defined in the [`messages`](./dgg_chat/messages/_messages.py) module.
 To register an event handler, you must use one of the decorators listed in the 
 [Event Types and Their Respective Handlers](#event-types-and-their-respective-handlers) section.
+All handlers are also synchronous, that is, a handler will only be called after the previous one
+finished its work. Asynchronous support might be implemented in the future.
 
 A simple example can be found under the [`DGGChat`](#dggchat) section. More details can be found in the [`example.py`](./example.py) file.
 

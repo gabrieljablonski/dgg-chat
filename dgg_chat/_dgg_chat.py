@@ -36,6 +36,8 @@ class DGGChat:
     # a bit of padding ensures it doesn't happen multiple times in a row
     BASE_WS_THROTTLE_FACTOR = 1.1
 
+    MAX_MESSAGE_LENGTH = 512
+
     def __init__(
         self, auth_token=None, session_id=None,
         validate_auth_token=True,
@@ -140,7 +142,7 @@ class DGGChat:
 
     @staticmethod
     def message_is_valid(msg):
-        return 0 < len(msg) <= 512
+        return 0 < len(msg) <= DGGChat.MAX_MESSAGE_LENGTH
 
     def _setup_web_socket(self):
         def on_message(ws, message):
