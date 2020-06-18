@@ -33,7 +33,9 @@ def dict_keys_camel_to_snake_case(d):
     return snaked
 
 
-def format_datetime(dt, fmt='%Y-%m-%d %H:%M:%S'):
+def format_datetime(dt, fmt='%Y-%m-%d %H:%M:%S', with_ms=False):
+    if with_ms:
+        fmt = f"{fmt}.%f"
     return dt.strftime(fmt)
 
 

@@ -17,6 +17,10 @@ class ChatMessage:
     def __repr__(self):
         return f"ChatMessage(user='{self.user}', date_time='{format_datetime(self.date_time)}', content='{self.content}')"
 
+    @property
+    def original(self):
+        return f"[format_date_time(self.date_time, with_ms=True)] {self.user}: self.content"
+
     @classmethod
     def from_chat_line(cls, line):
         match = findall(cls.CHAT_LINE_PATTERN, line.strip())
