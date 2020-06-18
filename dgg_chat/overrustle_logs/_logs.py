@@ -88,7 +88,7 @@ class DGGLogs:
         """
 
         endpoint = f"userlogs/{user}.txt"
-        return cls._get(year, month, endpoint)
+        return cls._get(endpoint, year, month)
 
     @classmethod
     def get_broadcaster_logs(cls, year=0, month: Union[int, str] = None):
