@@ -3,7 +3,7 @@
 A package that lets you do stuff in [dgg](https://destiny.gg) chat, like parsing messages in chat,
 replying to whispers, accessing the dgg API, and retrieving user logs and CDN assets.
 
-## How To Use
+## Installing
 
 This package is available via pip!
 
