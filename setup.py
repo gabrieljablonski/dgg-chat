@@ -16,7 +16,6 @@ setup(
     author='Gabriel Jablonski',
     author_email='contact@gabrieljablonski.com',
     url='https://github.com/gabrieljablonski/dgg-chat',
-    download_url='https://github.com/gabrieljablonski/dgg-chat/archive/v0.1.0-alpha.tar.gz',    # I explain this later on
     keywords=['chat-bot', 'chat', 'destinygg', 'dgg'],
     classifiers=[
         'Development Status :: 3 - Alpha',
