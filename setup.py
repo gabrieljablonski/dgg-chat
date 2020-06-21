@@ -25,7 +25,7 @@ setup(
     ],
     python_requires='>=3.8',
     install_requires=[
-        'websocket_client', 
+        'websocket_client',
         'requests',
         'numpy', 'wsaccel'  # improve websockets performance
     ],
