@@ -3,6 +3,8 @@
 A package that lets you do stuff in [dgg](https://destiny.gg) chat, like parsing messages in chat,
 replying to whispers, accessing the dgg API, and retrieving user logs and CDN assets.
 
+If you're interested in making a chat bot, check the [`dgg-chat-bot`](https://github.com/gabrieljablonski/dgg-chat-bot) package.
+
 ## Installing
 
 This package is available via pip!
