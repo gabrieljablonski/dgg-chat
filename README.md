@@ -7,7 +7,7 @@ If you're interested in making a chat bot, check the [`dgg-chat-bot`](https://gi
 
 ## Installing
 
-This package is available via pip!
+This package is available via pip (requires python 3.8).
 
 ```sh
 pip install dgg-chat
