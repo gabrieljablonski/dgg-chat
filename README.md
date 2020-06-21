@@ -36,12 +36,16 @@ When a message is received from the websocket, it is redirected to its respectiv
 
 ## How To Use
 
-A handler is a method that receives one argument (with two exceptions), which will 
-be of type `dgg_chat.messages.Message` or one of its subclasses. The two exceptions 
-are the handlers for the `WHISPER_SENT` and the `ON_WS_CLOSE` events, which have no arguments. 
+A handler is a method that receives one argument (with three exceptions), which will 
+be of type `dgg_chat.messages.Message` or one of its subclasses. 
+
+The three exceptions are: the handlers for the `WHISPER_SENT` and the `WS_CLOSE` events, which have no arguments;
+and the `HANDLER_ERROR` event, which receive the exceptions raised on trying to handle the message.
+
 Each handler receives a specific type of message, defined in the [`messages`](./dgg_chat/messages/_messages.py) module.
 To register an event handler, you must use one of the decorators listed in the 
 [Event Types and Their Respective Handlers](#event-types-and-their-respective-handlers) section.
+
 All handlers are also synchronous, that is, a handler will only be called after the previous one
 finished its work. Asynchronous support might be implemented in the future.
 
@@ -63,21 +67,23 @@ A simple example can be found under the [`DGGChat`](#dggchat) section. More deta
 | `on_ban`                  | A user was banned.                                                                                                            |
 | `on_unban`                | A user was unbanned.                                                                                                          |
 | `on_sub_only`             | Submode was toggled in chat.                                                                                                  |
-| `on_error`                | A chat related error occurred (see [common errors](#common-error-messages)).                                                  |
+| `on_error_message`        | A chat related error occurred (see [common errors](#common-error_message-causes)).                                            |
 
 #### Special Events
 
 Besides the already listed events, some others are triggered on special situations.
 Those are as follow:
 
-| Decorator             | Associated Event                                                                                                                                                        |
-|:---------------------:|:-----------------------------------------------------------------------------------------------------------------------------------------------------------------------:|
-| `on_any_message`      | Any event listed in the previous table. The specific handler for that event type will still be called.                                                                  |
-| `on_mention`          | Received a `ChatMessage` that contains the username for the authenticated user. Requires either `auth_token` or `session_id`. `CHAT_MESSAGE` handler is still called.   |
-| `on_ws_error`         | Something wrong happened with the websocket connection.                                                                                                                 |
-| `on_ws_close`         | Websocket connection got closed, usually by calling `DGGChat().disconnect()`.                                                                                           |
+| Decorator              | Associated Event                                                                                                                                                        |
+|:----------------------:|:-----------------------------------------------------------------------------------------------------------------------------------------------------------------------:|
+| `before_every_message` | Before every event listed in the previous table. The specific handlers for that event type will still be called.                                                        |
+| `after_every_message`  | After every event listed in the previous table. The specific handlers for that event type will still be called.                                                         |
+| `on_mention`           | Received a `ChatMessage` that contains the username for the authenticated user. Requires either `auth_token` or `session_id`. `CHAT_MESSAGE` handler is still called.   |
+| `on_ws_error`          | Something wrong happened with the websocket connection.                                                                                                                 |
+| `on_ws_close`          | Websocket connection got closed, usually by calling `DGGChat().disconnect()`.                                                                                           |
+| `on_handler_error`     | An exception was raised inside at least one of the handlers called.                                                                                                     |
 
-### Common `ERROR` Messages
+### Common `ERROR_MESSAGE` Causes
 
 | Error Message | Explanation                                                                                                                                                            |
 |:-------------:|:----------------------------------------------------------------------------------------------------------------------------------------------------------------------:|
@@ -155,6 +161,7 @@ ever received (and that wasn't deleted), you'll need a `session_id`.
 
 This one is a bit trickier to get, and it will expire, unlike `auth_token`. First open your browser, 
 navigate to [https://www.destiny.gg/bigscreen](), and login (if you're already logged in it works too).
+
 Bring up the dev tools (usually F12), go to the `Network` tab, and refresh the page.
 Find any request made on the destiny.gg domain (`bigscreen` will probably be one of the first ones).
 Scroll down to the `Cookies` header. The key after `sid=` is your session id.
