@@ -21,14 +21,14 @@ dgg_auth_token = getenv('DGG_AUTH_TOKEN')
 chat = DGGChat(auth_token=dgg_auth_token)
 
 
-@chat.on_any_message
-def on_any_message(message: Message):
-    print(f"from `on_any_message()`: {message}")
+@chat.before_every_message
+def before_every_message(message: Message):
+    print(f"from `before_every_message()`: {message}")
 
 
 # multiple handlers can be used for the same event
-@chat.on_any_message
-def alt_on_any_message(message: Message):
+@chat.before_every_message
+def alt_before_every_message(message: Message):
     ...
 
 
@@ -57,8 +57,8 @@ def on_whisper_sent():
     print('whisper ok')
 
 
-@chat.on_error
 @chat.on_ws_error
+@chat.on_error_message
 def on_ws_error(error):
     print(f"something went wrong: `{error}`")
 
@@ -66,6 +66,12 @@ def on_ws_error(error):
 @chat.on_ws_close
 def on_ws_close():
     print('connection closed')
+
+
+@chat.on_handler_error
+def on_handler_error(exceptions):
+    for e in exceptions:
+        print(e)
 
 
 # default way of running (blocking)

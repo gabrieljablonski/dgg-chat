@@ -4,8 +4,13 @@ import logging
 class DGGChatEventHandler:
     def __init__(self):
         self._handlers = {}
+        self._errors = []
 
-    def on(self, f, event):
+    @property
+    def errors(self):
+        return self._errors
+
+    def on(self, event, f):
         self._handlers.setdefault(event, set()).add(f)
         return f
 
@@ -23,7 +28,10 @@ class DGGChatEventHandler:
             return
 
         for handler in handlers:
-            if args:
-                handler(*args)
-            else:
-                handler()
+            try:
+                if args:
+                    handler(*args)
+                else:
+                    handler()
+            except Exception as e:
+                self._errors.append(e)

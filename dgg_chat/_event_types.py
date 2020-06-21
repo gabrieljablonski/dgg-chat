@@ -11,13 +11,15 @@ class EventTypes:
     BAN = 'BAN'
     UNBAN = 'UNBAN'
     SUB_ONLY = 'SUBONLY'
-    ERROR = 'ERR'
+    ERROR_MESSAGE = 'ERR'
 
     class Special:
-        ANY_MESSAGE = 'ANY_MESSAGE'
+        BEFORE_EVERY_MESSAGE = 'BEFORE_EVERY_MESSAGE'
+        AFTER_EVERY_MESSAGE = 'AFTER_EVERY_MESSAGE'
         MENTION = 'MENTION'
         WS_ERROR = 'WS_ERROR'
         WS_CLOSE = 'WS_CLOSE'
+        HANDLER_ERROR = 'HANDLER_ERROR'
 
     @staticmethod
     def is_moderation_event(msg_type):

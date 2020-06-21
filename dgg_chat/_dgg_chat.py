@@ -144,6 +144,11 @@ class DGGChat:
     def message_is_valid(msg):
         return 0 < len(msg) <= DGGChat.MAX_MESSAGE_LENGTH
 
+    def _handle_errors(self):
+        if self._handler.errors:
+            self._handler.handle_event(EventTypes.Special.HANDLER_ERROR, self._handler.errors)
+            self._handler.errors.clear()
+
     def _setup_web_socket(self):
         def on_message(ws, message):
             """The top-level message handling function."""
@@ -153,7 +158,9 @@ class DGGChat:
             logging.debug(f"received message: `{message}`")
             logging.info(f"parsed message: `{parsed}`")
 
-            if not self._unhandled_messages.empty() and parsed.event in (EventTypes.ERROR, EventTypes.WHISPER_SENT):
+            self._handler.handle_event(EventTypes.Special.BEFORE_EVERY_MESSAGE, parsed)
+
+            if not self._unhandled_messages.empty() and parsed.event in (EventTypes.ERROR_MESSAGE, EventTypes.WHISPER_SENT):
                 self._handle_message(parsed)
 
             if parsed.event == EventTypes.WHISPER:
@@ -163,8 +170,6 @@ class DGGChat:
                     logging.info(
                         f"{parsed.user.nick} added to users available to whisper"
                     )
-
-            self._handler.handle_event(EventTypes.Special.ANY_MESSAGE, parsed)
 
             if self._profile and parsed.event == EventTypes.CHAT_MESSAGE and self._profile.nick in parsed.content:
                 self._handler.handle_event(EventTypes.Special.MENTION, parsed)
@@ -176,6 +181,8 @@ class DGGChat:
                 # `on_whisper_sent` handler takes no arguments
                 return self._handler.handle_event(parsed.event)
             self._handler.handle_event(parsed.event, parsed)
+            self._handler.handle_event(EventTypes.Special.AFTER_EVERY_MESSAGE, parsed)
+            self._handle_errors()
 
         def on_ws_error(ws, error):
             """Handler for websocket related errors."""
@@ -243,7 +250,7 @@ class DGGChat:
             logging.info('resetting throttle factor')
             self._ws_throttle_factor = self.BASE_WS_THROTTLE_FACTOR
 
-        if message.event == EventTypes.ERROR:
+        if message.event == EventTypes.ERROR_MESSAGE:
             # max throttle factor seems to be 16 (16*.3=5s)
             # verified empirically since this doesn't seem to match the source code (https://github.com/destinygg/chat/blob/master/connection.go#L407)
             if message.payload == 'throttled':
@@ -377,6 +384,8 @@ class DGGChat:
         if self.handle_history:
             self._handle_history()
 
+        self._handle_errors()
+
         logging.info('running websocket on loop')
         self._start_send_loop()
 
@@ -403,16 +412,8 @@ class DGGChat:
         logging.info('queue send whisper')
         self._queue_message(EventTypes.WHISPER, nick=user, data=message)
 
-    def _on(self, f, event):
-        return self._handler.on(f, event)
-
-    def on_any_message(self, f):
-        """
-        Called when receiving any message. 
-        Specific handler still called as usual.
-        """
-
-        return self._on(f, EventTypes.Special.ANY_MESSAGE)
+    def _on(self, event, f):
+        return self._handler.on(event, f)
 
     def on_served_connections(self, f):
         """
@@ -420,13 +421,13 @@ class DGGChat:
         which lists all users connected and amount of connections currently served.
         """
 
-        return self._on(f, EventTypes.SERVED_CONNECTIONS)
+        return self._on(EventTypes.SERVED_CONNECTIONS, f)
 
     def on_user_joined(self, f):
-        return self._on(f, EventTypes.USER_JOINED)
+        return self._on(EventTypes.USER_JOINED, f)
 
     def on_user_quit(self, f):
-        return self._on(f, EventTypes.USER_QUIT)
+        return self._on(EventTypes.USER_QUIT, f)
 
     def on_broadcast(self, f):
         """
@@ -434,10 +435,10 @@ class DGGChat:
         such as when a user subscribes.
         """
 
-        return self._on(f, EventTypes.BROADCAST)
+        return self._on(EventTypes.BROADCAST, f)
 
     def on_chat_message(self, f):
-        return self._on(f, EventTypes.CHAT_MESSAGE)
+        return self._on(EventTypes.CHAT_MESSAGE, f)
 
     def on_mention(self, f):
         """
@@ -446,38 +447,38 @@ class DGGChat:
         so it doesn't need to be mapped. `on_chat_message()` is still called.
         """
 
-        return self._on(f, EventTypes.Special.MENTION)
+        return self._on(EventTypes.Special.MENTION, f)
 
     def on_whisper(self, f):
-        return self._on(f, EventTypes.WHISPER)
+        return self._on(EventTypes.WHISPER, f)
 
     def on_whisper_sent(self, f):
         """Called on confirmation messages that a whisper was successfully sent."""
 
-        return self._on(f, EventTypes.WHISPER_SENT)
+        return self._on(EventTypes.WHISPER_SENT, f)
 
     def on_mute(self, f):
-        return self._on(f, EventTypes.MUTE)
+        return self._on(EventTypes.MUTE, f)
 
     def on_unmute(self, f):
-        return self._on(f, EventTypes.UNMUTE)
+        return self._on(EventTypes.UNMUTE, f)
 
     def on_ban(self, f):
-        return self._on(f, EventTypes.BAN)
+        return self._on(EventTypes.BAN, f)
 
     def on_unban(self, f):
-        return self._on(f, EventTypes.UNBAN)
+        return self._on(EventTypes.UNBAN, f)
 
     def on_sub_only(self, f):
-        return self._on(f, EventTypes.SUB_ONLY)
+        return self._on(EventTypes.SUB_ONLY, f)
 
-    def on_error(self, f):
+    def on_error_message(self, f):
         """
         Called on an error message when something goes wrong, 
         such as when sending a whisper to a user that doesn't exist.
         """
 
-        return self._on(f, EventTypes.ERROR)
+        return self._on(EventTypes.ERROR_MESSAGE, f)
 
     def on_ws_error(self, f):
         """
@@ -486,7 +487,7 @@ class DGGChat:
         so it doesn't need to be mapped.
         """
 
-        return self._on(f, EventTypes.Special.WS_ERROR)
+        return self._on(EventTypes.Special.WS_ERROR, f)
 
     def on_ws_close(self, f):
         """
@@ -495,4 +496,17 @@ class DGGChat:
         so it doesn't need to be mapped.
         """
 
-        return self._on(f, EventTypes.Special.WS_CLOSE)
+        return self._on(EventTypes.Special.WS_CLOSE, f)
+
+    def on_handler_error(self, f):
+        """
+        Called when something goes wrong in any of the handlers called.
+        """
+
+        return self._on(EventTypes.Special.HANDLER_ERROR, f)
+
+    def before_every_message(self, f):
+        return self._on(EventTypes.Special.BEFORE_EVERY_MESSAGE, f)
+
+    def after_every_message(self, f):
+        return self._on(EventTypes.Special.AFTER_EVERY_MESSAGE, f)
