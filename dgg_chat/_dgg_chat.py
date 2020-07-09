@@ -285,7 +285,13 @@ class DGGChat:
             payload = self._queued_messages.get()
             logging.debug(f"sending payload: `{payload}`")
 
-            self._ws.send(payload)
+            try:
+                self._ws.send(payload)
+            except Exception as e:
+                logging.error(f"on send loop: {e}")
+                self._queued_messages.put(payload)
+                continue
+            
             self._unhandled_messages.put(payload)
 
             if self._anti_throttle_bot:
@@ -409,7 +415,7 @@ class DGGChat:
         if not enabled or enabled in ('none', 'false') or user not in self._users_available_to_whisper:
             raise DumbFucksBeware('cannot send whispers')
 
-        logging.info('queue send whisper')
+        logging.info(f"queue send whisper to {user}: `{message}`")
         self._queue_message(EventTypes.WHISPER, nick=user, data=message)
 
     def _on(self, event, f):
